@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Dance Sync spike ---
+# Media and regenerable artifacts stay local; the folder structure is tracked.
+spike/data/reference/*
+spike/data/clips/*
+spike/data/inbox/*
+spike/data/synthetic/*
+spike/data/cache/*
+spike/data/manifest.json
+spike/out/plots/*
+spike/out/results/*
+!**/.gitkeep
