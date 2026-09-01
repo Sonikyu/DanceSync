@@ -71,6 +71,21 @@ These carry forward from the spike into production code:
 - **Overlap normalization needs its floor.** Without `MIN_OVERLAP_FRAC` a two-frame edge alignment wins everything.
 - **Tier A failures are code bugs, not findings.** If the synthetic gate fails after a matcher change, the change broke something — don't debug with real recordings.
 
+## Coding style
+
+The owner of this repo reviews and debugs every line. Write code they can read in one pass.
+
+- **Short modules.** A file over 200 lines probably does two things — split it. The spike's matcher is 253 lines and that's the upper end.
+- **Flat is better than nested.** Avoid deep nesting — early returns, guard clauses, and extracting helpers all beat 4-level indentation. If a function has more than one level of `if`/`for` nesting, refactor.
+- **No clever abstractions.** No metaclasses, no decorator factories, no generic base classes. A plain function that does one thing is always preferred. The right amount of abstraction is "I can delete this module and nothing else breaks."
+- **Name things for what they hold, not what they do.** `offset_sec` not `result`, `clip_features` not `processed_data`. Variable names are documentation.
+- **No dead code.** No commented-out blocks, no `# TODO: maybe later`, no unused imports. If it's not called, delete it.
+- **Small functions.** If you can't describe what a function does in one sentence, it does too much. Aim for functions under 30 lines; if one hits 50, split it.
+- **Minimal dependencies.** Every `import` is a thing to understand. Use the standard library when it's close enough. Add a third-party dep only when it saves real complexity (like librosa for audio analysis), not for convenience wrappers.
+- **Explicit over implicit.** No `**kwargs` passthrough unless you're wrapping an external API. No `setattr` magic. If a function takes 5 parameters, write out 5 parameters.
+- **Docstrings only where the signature isn't enough.** A function called `decode_to_mono(path: Path, sr: int) -> np.ndarray` doesn't need a docstring. A function whose units or coordinate system aren't obvious does.
+- **Type hints on public interfaces.** Module-level functions and dataclass fields get type hints. Local variables don't need them.
+
 ## Development conventions
 
 - **Python 3.11+**, dependencies in `requirements.txt` (spike) or `pyproject.toml` (product)
