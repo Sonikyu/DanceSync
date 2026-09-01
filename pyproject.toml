@@ -7,11 +7,15 @@ dependencies = [
     "numpy>=1.24",
     "librosa>=0.10",
     "soundfile>=0.12",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "httpx>=0.27",
 ]
 
 [build-system]
@@ -19,7 +23,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["dancesync*"]
+include = ["dancesync*", "server*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -217,6 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# --- Dance Sync server ---
+# Uploaded media and the local metadata catalog; not shipped, not tracked.
+.data/
+
 # --- Dance Sync spike ---
 # Media and regenerable artifacts stay local; the folder structure is tracked.
 spike/data/reference/*
