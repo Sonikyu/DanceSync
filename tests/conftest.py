@@ -1,17 +1,28 @@
 """Synthetic fixtures: a fake reference track and cut-and-stretch clips with
 known ground truth. Ported from the spike's `synth.py` -- the same generator
-that produced the spike's Tier A gate.
+that produced the spike's Tier A gate. Plus a flash video (a visual marker at
+a known time, for checking where frames land after re-timing) and an API test
+client with its own storage root.
 """
 
 from __future__ import annotations
 
+import io
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import pytest
+import soundfile as sf
+from fastapi.testclient import TestClient
 
 from dancesync.config import SR
+from server.catalog import Catalog
+from server.deps import get_catalog, get_storage
+from server.main import app
+from server.storage import LocalStorage
 
 # Deliberately non-repeating chord order. An earlier version of this generator
 # cycled a fixed progression and produced a track that was exactly
@@ -117,6 +128,62 @@ def make_clip(
     )
 
 
+def write_flash_video(
+    path: Path,
+    duration_sec: float,
+    flash_sec: float,
+    audio_path: Optional[Path] = None,
+) -> None:
+    """A black 30 fps video that turns white at `flash_sec`. With
+    `audio_path`, that file becomes the soundtrack, like a phone filming a
+    laptop speaker."""
+    video_source = (
+        f"color=c=black:s=64x64:r=30:d={duration_sec},"
+        f"drawbox=c=white:t=fill:enable='gte(t,{flash_sec})'"
+    )
+    cmd = ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", video_source]
+    if audio_path is not None:
+        cmd += ["-i", str(audio_path), "-c:a", "aac"]
+    cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)]
+    subprocess.run(cmd, check=True)
+
+
+def flash_time_sec(video_path: Path) -> float:
+    """When the first white frame appears. Frames are resampled onto a fixed
+    100 fps grid first, so this reads true timestamps whatever the file's
+    own frame rate."""
+    cmd = [
+        "ffmpeg", "-v", "error", "-i", str(video_path),
+        "-vf", "scale=1:1,format=gray,fps=100", "-f", "rawvideo", "-",
+    ]
+    luma = np.frombuffer(subprocess.run(cmd, capture_output=True, check=True).stdout, np.uint8)
+    return int(np.argmax(luma > 128)) / 100
+
+
+def wav_bytes(y: np.ndarray, sr: int = SR) -> bytes:
+    buf = io.BytesIO()
+    sf.write(buf, y, sr, format="WAV", subtype="FLOAT")
+    return buf.getvalue()
+
+
+def upload_reference(client: TestClient, ref_audio: np.ndarray) -> dict:
+    files = {"file": ("song.wav", wav_bytes(ref_audio), "audio/wav")}
+    resp = client.post("/api/references", files=files)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
 @pytest.fixture(scope="session")
 def reference_audio() -> np.ndarray:
     return make_reference(duration_sec=180.0, sr=SR, seed=7)
+
+
+@pytest.fixture
+def client(tmp_path):
+    """Each test gets its own storage root via dependency overrides, so tests
+    never touch `.data/server` or each other's state."""
+    app.dependency_overrides[get_storage] = lambda: LocalStorage(tmp_path / "media")
+    app.dependency_overrides[get_catalog] = lambda: Catalog(tmp_path / "catalog")
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()

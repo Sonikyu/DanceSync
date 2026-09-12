@@ -26,6 +26,18 @@ MIN_OVERLAP_FRAC = 0.5
 # the winner -- they are the same match, not a competing one.
 PEAK_EXCLUDE_SEC = 2.0
 
+# --- Synced video output ----------------------------------------------------
+
+# H.264 Constrained Baseline + AAC-LC plays in every browser <video> element.
+# CRF 18 is visually lossless -- the dancer's phone footage is their source of
+# truth. The preset trades file size for speed, not quality: on an M-series
+# Mac, veryfast encoded 20 s of 1080p in 1.0 s, medium in 2.5 s for a file
+# only a few percent smaller.
+VIDEO_PROFILE = "baseline"
+VIDEO_CRF = 18
+VIDEO_PRESET = "veryfast"
+AUDIO_BITRATE = "192k"
+
 # --- Paths ------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parent.parent
