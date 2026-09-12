@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from server.config import ALLOWED_ORIGINS, STORAGE_ROOT
-from server.routes import align, clips, references
+from server.routes import align, clips, references, synced
 
 
 @asynccontextmanager
@@ -29,3 +29,4 @@ app.add_middleware(
 app.include_router(references.router)
 app.include_router(clips.router)
 app.include_router(align.router)
+app.include_router(synced.router)
