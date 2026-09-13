@@ -26,6 +26,14 @@ MIN_OVERLAP_FRAC = 0.5
 # the winner -- they are the same match, not a competing one.
 PEAK_EXCLUDE_SEC = 2.0
 
+# Below this peak_ratio the winner isn't clearly better than the next-best
+# part of the song, so the UI asks the user to pick instead of committing.
+# Measured: a chorus repeated word for word scores 1.04-1.06 (synthetic and
+# the real Tier B song alike); passages heard once score 1.4-2.0, dipping to
+# 1.15 at worst. Erring high costs the user one extra click; erring low
+# renders the wrong part of the song.
+AMBIGUOUS_PEAK_RATIO = 1.2
+
 # --- Synced video output ----------------------------------------------------
 
 # H.264 Constrained Baseline + AAC-LC plays in every browser <video> element.
@@ -37,6 +45,12 @@ VIDEO_PROFILE = "baseline"
 VIDEO_CRF = 18
 VIDEO_PRESET = "veryfast"
 AUDIO_BITRATE = "192k"
+
+# Side-by-side renders scale both videos to one height and put them on one
+# frame grid. 60 fps is above any phone clip re-timed from 30 fps (40 at
+# 0.75x, 60 at 0.5x), so frames only ever get duplicated, never dropped.
+SIDE_BY_SIDE_HEIGHT = 720
+SIDE_BY_SIDE_FPS = 60
 
 # --- Paths ------------------------------------------------------------------
 

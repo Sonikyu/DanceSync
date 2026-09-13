@@ -11,7 +11,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from dancesync import audio, matcher, sync
+from dancesync.sync import Sound
 from dancesync.types import MatchResult
+from server.models import Layout
 
 
 def align_clip(clip_path: Path, reference_path: Path, reference_id: str) -> MatchResult:
@@ -27,10 +29,15 @@ def sync_clip(
     rate: float,
     offset_sec: float,
     out_path: Path,
+    sound: Sound,
+    layout: Layout,
 ) -> None:
     """Render the synced video unless an earlier request already did. The
     caller names `out_path` after everything the render depends on, so an
     existing file is never stale."""
     if out_path.exists():
         return
-    sync.render_synced(clip_path, reference_path, rate, offset_sec, out_path)
+    if layout == "side-by-side":
+        sync.render_side_by_side(clip_path, reference_path, rate, offset_sec, out_path, sound)
+    else:
+        sync.render_synced(clip_path, reference_path, rate, offset_sec, out_path, sound)

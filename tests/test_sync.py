@@ -14,7 +14,8 @@ import pytest
 import soundfile as sf
 
 from dancesync import audio, sync
-from dancesync.config import SR
+from dancesync.config import SIDE_BY_SIDE_FPS, SIDE_BY_SIDE_HEIGHT, SR
+from dancesync.ffmpeg import SyncError
 from tests.conftest import flash_time_sec, write_flash_video
 
 pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
@@ -161,12 +162,83 @@ def test_phone_rotation_baked_in(reference_path, tmp_path):
 
 
 def test_audio_only_clip_raises(reference_path, tmp_path):
-    with pytest.raises(sync.SyncError, match="no video stream"):
+    with pytest.raises(SyncError, match="no video stream"):
         sync.render_synced(reference_path, reference_path, 1.0, 0.0, tmp_path / "out.mp4")
 
 
 def test_failed_render_leaves_no_file(clip_path, tmp_path):
     out_dir = tmp_path / "out"
-    with pytest.raises(sync.SyncError):
+    with pytest.raises(SyncError):
         sync.render_synced(clip_path, tmp_path / "missing.wav", 1.0, 0.0, out_dir / "synced.mp4")
     assert list(out_dir.iterdir()) == []
+
+
+def test_room_sound_is_the_phone_recording_sped_up(reference_path, tmp_path):
+    """The phone heard a click at clip time 1.0 s; at 0.75x it lands at 0.75 s.
+    The song's own click (reference 11.5 s) would land at 1.5 s instead."""
+    room = tmp_path / "room.wav"
+    _write_click_reference(room, duration_sec=CLIP_SEC, click_sec=1.0)
+    clip = tmp_path / "practice.mp4"
+    write_flash_video(clip, duration_sec=CLIP_SEC, flash_sec=FLASH_SEC, audio_path=room)
+    out = tmp_path / "synced.mp4"
+    sync.render_synced(clip, reference_path, rate=0.75, offset_sec=10.0, out_path=out, sound="room")
+
+    _, duration = _probe(out)
+    assert duration == pytest.approx(CLIP_SEC * 0.75, abs=0.05)
+    assert _click_time_sec(out) == pytest.approx(0.75, abs=0.02)
+    assert flash_time_sec(out) == pytest.approx(FLASH_SEC * 0.75, abs=FRAME_SEC + 0.01)
+
+
+def _flash_time_in_half_sec(video_path, half: str) -> float:
+    """Like `flash_time_sec`, but watching only the left or right half."""
+    x = "0" if half == "left" else "iw/2"
+    cmd = [
+        "ffmpeg", "-v", "error", "-i", str(video_path),
+        "-vf", f"crop=iw/2:ih:{x}:0,scale=1:1,format=gray,fps=100", "-f", "rawvideo", "-",
+    ]
+    luma = np.frombuffer(subprocess.run(cmd, capture_output=True, check=True).stdout, np.uint8)
+    return int(np.argmax(luma > 128)) / 100
+
+
+def _write_flash_reference(tmp_path, duration_sec, flash_sec):
+    """A reference *video*: flashes white at `flash_sec`, with a click there too."""
+    song = tmp_path / "song-audio.wav"
+    _write_click_reference(song, duration_sec=duration_sec, click_sec=flash_sec)
+    path = tmp_path / "choreography.mp4"
+    write_flash_video(path, duration_sec=duration_sec, flash_sec=flash_sec, audio_path=song)
+    return path
+
+
+def test_side_by_side_lines_up_reference_and_take(clip_path, tmp_path):
+    """The reference flashes at 11.5 s: the moment the practice session heard
+    at clip time 2.0 s, when the clip flashes (rate 0.75, offset 10 s). Both
+    halves flash together at 1.5 s -- reference left, take right."""
+    reference = _write_flash_reference(tmp_path, duration_sec=20.0, flash_sec=11.5)
+    out = tmp_path / "side.mp4"
+    sync.render_side_by_side(clip_path, reference, rate=0.75, offset_sec=10.0, out_path=out)
+
+    streams, duration = _probe(out)
+    # Both test videos are square, so each half is as wide as it is tall.
+    assert (streams["video"]["width"], streams["video"]["height"]) == (
+        2 * SIDE_BY_SIDE_HEIGHT, SIDE_BY_SIDE_HEIGHT,
+    )
+    assert duration == pytest.approx(CLIP_SEC * 0.75, abs=0.05)
+    assert np.allclose(np.diff(_frame_times_sec(out)), 1 / SIDE_BY_SIDE_FPS, atol=1e-3)
+    assert _flash_time_in_half_sec(out, "left") == pytest.approx(1.5, abs=FRAME_SEC + 0.01)
+    assert _flash_time_in_half_sec(out, "right") == pytest.approx(1.5, abs=FRAME_SEC + 0.01)
+    assert _click_time_sec(out) == pytest.approx(1.5, abs=0.01)
+
+
+def test_side_by_side_holds_black_until_a_late_song_starts(clip_path, tmp_path):
+    """Recording started 1 s before the song: the reference's flash at 1.0 s
+    shows up 2.0 s into the output, after a second of black."""
+    reference = _write_flash_reference(tmp_path, duration_sec=10.0, flash_sec=1.0)
+    out = tmp_path / "side.mp4"
+    sync.render_side_by_side(clip_path, reference, rate=1.0, offset_sec=-1.0, out_path=out)
+
+    assert _flash_time_in_half_sec(out, "left") == pytest.approx(2.0, abs=FRAME_SEC + 0.01)
+
+
+def test_side_by_side_with_audio_only_song_raises(clip_path, reference_path, tmp_path):
+    with pytest.raises(SyncError, match="no video stream"):
+        sync.render_side_by_side(clip_path, reference_path, 1.0, 0.0, tmp_path / "out.mp4")
