@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import datetime, timezone
+from math import isinf
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from dancesync.audio import is_supported
+from dancesync.config import AMBIGUOUS_PEAK_RATIO
+from dancesync.types import Candidate as MatchCandidate
 from server.catalog import Catalog
 from server.config import MAX_CLIP_BYTES
 from server.deps import get_catalog, get_storage
@@ -46,7 +48,8 @@ async def upload_clip(
         reference_id=reference.id,
         filename=file.filename,
         alignment=AlignmentResult(
-            top_candidates=[Candidate(**asdict(c)) for c in match.top_candidates]
+            top_candidates=[_candidate_model(c) for c in match.top_candidates],
+            ambiguous=match.peak_ratio < AMBIGUOUS_PEAK_RATIO,
         ),
         created_at=datetime.now(timezone.utc),
     )
@@ -60,3 +63,15 @@ async def get_clip(clip_id: str, catalog: Catalog = Depends(get_catalog)) -> Cli
     if clip is None:
         raise HTTPException(404, f"no clip with id {clip_id}")
     return clip
+
+
+def _candidate_model(candidate: MatchCandidate) -> Candidate:
+    """An infinite peak_ratio (no competing peak at all) becomes None, since
+    JSON can't carry infinity."""
+    peak_ratio = None if isinf(candidate.peak_ratio) else candidate.peak_ratio
+    return Candidate(
+        rate=candidate.rate,
+        offset_sec=candidate.offset_sec,
+        score=candidate.score,
+        peak_ratio=peak_ratio,
+    )

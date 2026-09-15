@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from tests.conftest import make_clip, make_reference, upload_reference, wav_bytes
+from dancesync.config import AMBIGUOUS_PEAK_RATIO
+from dancesync.types import Candidate as MatchCandidate
+from dancesync.types import MatchResult
+from server.routes import clips as clip_routes
+from tests.conftest import make_clip, make_reference, upload_clip, upload_reference, wav_bytes
 
 
 def test_upload_reference(client):
@@ -94,3 +98,66 @@ def test_select_candidate_out_of_range_rejected(client):
 
     resp = client.post(f"/api/clips/{clip_id}/select", json={"index": 99})
     assert resp.status_code == 400
+
+
+def test_references_listed_newest_first(client):
+    first = upload_reference(client, make_reference(duration_sec=10.0, seed=12))
+    second = upload_reference(client, make_reference(duration_sec=10.0, seed=13))
+
+    listed = client.get("/api/references").json()
+    assert [r["id"] for r in listed] == [second["id"], first["id"]]
+
+
+def test_reference_media_served_with_range_support(client):
+    ref_audio = make_reference(duration_sec=20.0, seed=11)
+    reference = upload_reference(client, ref_audio)
+    url = f"/api/references/{reference['id']}/media"
+
+    full = client.get(url)
+    assert full.status_code == 200
+    assert full.content == wav_bytes(ref_audio)
+
+    # Byte ranges let the browser seek to a candidate's offset without
+    # downloading the whole song first.
+    partial = client.get(url, headers={"Range": "bytes=100-199"})
+    assert partial.status_code == 206
+    assert partial.content == full.content[100:200]
+
+
+def test_reference_media_unknown_404s(client):
+    assert client.get("/api/references/nope/media").status_code == 404
+
+
+def _fake_match(*peak_ratios: float) -> MatchResult:
+    candidates = tuple(
+        MatchCandidate(rate=0.75, offset_sec=10.0 * i, score=1.0 - 0.1 * i, peak_ratio=ratio)
+        for i, ratio in enumerate(peak_ratios)
+    )
+    return MatchResult(top_candidates=candidates)
+
+
+@pytest.mark.parametrize(
+    ("peak_ratio", "ambiguous"),
+    [(AMBIGUOUS_PEAK_RATIO - 0.01, True), (AMBIGUOUS_PEAK_RATIO + 0.01, False)],
+)
+def test_ambiguous_flag_follows_winner_peak_ratio(client, monkeypatch, peak_ratio, ambiguous):
+    monkeypatch.setattr(clip_routes, "align_clip", lambda *args: _fake_match(peak_ratio, 0.9))
+    reference = upload_reference(client, make_reference(duration_sec=20.0, seed=14))
+
+    body = upload_clip(client, reference["id"], make_reference(duration_sec=5.0, seed=15))
+    assert body["alignment"]["ambiguous"] is ambiguous
+
+
+def test_unrivaled_peak_round_trips_as_null(client, monkeypatch):
+    """A winner with no competing peak has an infinite peak_ratio, which JSON
+    can't carry. It comes back as null, and the clip still loads from the catalog."""
+    monkeypatch.setattr(clip_routes, "align_clip", lambda *args: _fake_match(float("inf")))
+    reference = upload_reference(client, make_reference(duration_sec=20.0, seed=16))
+
+    body = upload_clip(client, reference["id"], make_reference(duration_sec=5.0, seed=17))
+    assert body["alignment"]["top_candidates"][0]["peak_ratio"] is None
+    assert body["alignment"]["ambiguous"] is False
+
+    fetched = client.get(f"/api/clips/{body['id']}")
+    assert fetched.status_code == 200
+    assert fetched.json() == body

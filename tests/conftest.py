@@ -173,6 +173,13 @@ def upload_reference(client: TestClient, ref_audio: np.ndarray) -> dict:
     return resp.json()
 
 
+def upload_clip(client: TestClient, reference_id: str, clip_audio: np.ndarray) -> dict:
+    files = {"file": ("practice.wav", wav_bytes(clip_audio), "audio/wav")}
+    resp = client.post("/api/clips", params={"reference_id": reference_id}, files=files)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
 @pytest.fixture(scope="session")
 def reference_audio() -> np.ndarray:
     return make_reference(duration_sec=180.0, sr=SR, seed=7)

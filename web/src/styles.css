@@ -1,0 +1,146 @@
+:root {
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --text: #1c1917;
+  --text-muted: #78716c;
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+  --accent: #5b4cdb;
+  --on-accent: #ffffff;
+  --accent-soft: #efedfd;
+  --danger: #c2410c;
+  --radius: 12px;
+
+  color-scheme: light dark;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121211;
+    --surface: #1c1b1a;
+    --text: #f5f5f4;
+    --text-muted: #a8a29e;
+    --border: #2c2a28;
+    --border-strong: #44403c;
+    --accent: #9489f5;
+    --on-accent: #121211;
+    --accent-soft: #26223f;
+    --danger: #fb923c;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+p { margin: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* --- Page frame --- */
+
+.app { display: flex; flex-direction: column; max-width: 480px; min-height: 100dvh; margin: 0 auto; padding: 0 20px 32px; }
+.header { display: flex; flex: none; align-items: center; justify-content: space-between; height: 64px; }
+.wordmark { font-weight: 600; letter-spacing: -0.01em; }
+
+.dots { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.dot { width: 6px; height: 6px; border-radius: 3px; background: var(--border-strong); transition: width 0.2s, background 0.2s; }
+.dot.done { background: var(--text-muted); }
+.dot.current { width: 18px; background: var(--accent); }
+
+.step { display: flex; flex: 1; flex-direction: column; gap: 16px; padding-top: 32px; }
+.lede { margin-top: -8px; color: var(--text-muted); }
+.back { align-self: flex-start; margin-bottom: -8px; padding: 0; border: 0; background: none; color: var(--text-muted); font: inherit; font-size: 14px; cursor: pointer; }
+.back:hover { color: var(--text); }
+.hint { color: var(--text-muted); font-size: 14px; }
+.error { color: var(--danger); font-size: 14px; }
+
+/* --- Buttons --- */
+
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-weight: 500; text-decoration: none; cursor: pointer; }
+.button:hover { border-color: var(--text-muted); }
+.button.primary { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.button.small { flex: none; height: 36px; padding: 0 14px; font-size: 14px; }
+.link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible, .dropzone:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.actions { display: flex; gap: 12px; margin-top: auto; padding-top: 16px; }
+.actions > * { flex: 1; }
+
+/* --- Song list --- */
+
+.list { margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); list-style: none; }
+.list li + li { border-top: 1px solid var(--border); }
+.list-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.list-item:hover { background: var(--bg); }
+.list-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-item .meta { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* --- Drop zone --- */
+
+.dropzone { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 28px 16px; border: 1.5px dashed var(--border-strong); border-radius: var(--radius); text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.dropzone.large { padding: 72px 16px; }
+.dropzone:hover, .dropzone.dragging { border-color: var(--accent); background: var(--accent-soft); }
+.dropzone-label { font-weight: 500; }
+
+/* --- Progress --- */
+
+.working { display: flex; flex-direction: column; gap: 12px; padding: 48px 0; }
+.working-label { display: flex; justify-content: space-between; font-weight: 500; font-variant-numeric: tabular-nums; }
+.progress { height: 4px; overflow: hidden; border-radius: 2px; background: var(--border); }
+.progress-fill { height: 100%; background: var(--accent); transition: width 0.2s; }
+.progress.indeterminate .progress-fill { width: 30%; animation: slide 1.2s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .progress.indeterminate .progress-fill { width: 100%; animation: none; opacity: 0.4; }
+}
+
+/* --- Match review --- */
+
+.timeline { position: relative; height: 28px; margin: 8px 12px 0; }
+.timeline-track { position: absolute; top: 12px; right: -12px; left: -12px; height: 4px; border-radius: 2px; background: var(--border); }
+.timeline-marker { position: absolute; top: 2px; display: grid; place-items: center; width: 24px; height: 24px; margin-left: -12px; border: 2px solid var(--bg); border-radius: 50%; background: var(--text-muted); color: var(--bg); font-size: 12px; font-weight: 600; transition: background 0.15s; }
+.timeline-marker.active { background: var(--accent); }
+.timeline-ends { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.cards { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 0; padding: 0; list-style: none; }
+.card { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); transition: border-color 0.15s; }
+.card.active { border-color: var(--accent); }
+.play { display: grid; flex: none; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--accent-soft); color: var(--accent); cursor: pointer; }
+.card-body { flex: 1; min-width: 0; }
+.card-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card-number { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--border); color: var(--text-muted); font-size: 11px; }
+.card-meta { color: var(--text-muted); font-size: 14px; }
+
+/* --- Result --- */
+
+.caption { color: var(--text-muted); font-size: 14px; text-align: center; }
+
+/* Wider than the 480px column when there are two videos to fit side by side. */
+.player { display: flex; flex-direction: column; gap: 12px; }
+.player.wide { align-self: center; width: min(960px, 100vw - 48px); }
+.compare { display: flex; flex-direction: column; gap: 8px; }
+.compare-video { display: block; width: 100%; min-width: 0; max-height: 60dvh; border-radius: var(--radius); background: #000; }
+.player.wide .compare-video.take { max-height: 45dvh; }
+
+/* Side by side, each video's width set by its aspect ratio so both end up
+   the same height. */
+@media (min-width: 720px) {
+  .player.wide .compare { flex-direction: row; align-items: flex-start; }
+  .player.wide .compare-video { flex: var(--aspect, 1) 1 0; }
+  .player.wide .compare-video.take { max-height: 60dvh; }
+}
+
+.playbar { display: flex; align-items: center; gap: 12px; }
+.scrubber { flex: 1; min-width: 0; accent-color: var(--accent); }
+.playbar-time { color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.sound { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--border); }
+.segmented button { height: 30px; padding: 0 16px; border: 0; border-radius: 7px; background: none; color: var(--text-muted); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.segmented button[aria-checked="true"] { background: var(--surface); color: var(--text); }
+.segmented button:disabled { color: var(--border-strong); cursor: default; }

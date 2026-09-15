@@ -1,238 +1,133 @@
 # DanceSync — Build Plan
 
-The alignment spike is validated. This document is the roadmap for the full product build, written so each phase can be handed to Claude Code as a self-contained task.
+The alignment spike validated the approach, and the MVP (Phases 1–4) is built: upload a song and a practice video, align them, confirm the match when it's ambiguous, and watch or download the synced result. What's left is Phase 5 (polish and deployment) and the post-MVP features. Each feature is specced in [`specs/`](specs/) so it can be handed to Claude Code as a self-contained task.
+
+**Audience:** the owner and friends, running DanceSync locally or self-hosted rather than as a public site. That shapes Phase 5, which needs basic access control but nothing for multiple tenants, and it's what makes YouTube import viable.
 
 ---
 
 ## Product concept
 
-A dancer practices to music played at reduced speed (typically 0.75x) on a laptop speaker, filming themselves on their phone. DanceSync takes that phone recording, identifies which song is playing and where in the song the clip starts, then produces a version of the video re-timed to the original speed — so the dancer can review their practice at full tempo, perfectly synced to the reference track.
+A dancer practices to music played at reduced speed (typically 0.75x) on a laptop speaker, filming themselves on their phone. DanceSync takes that recording and finds where in the song it starts and how fast the song was playing. It then re-times the video to the original speed, so the dancer can review the practice at full tempo, in sync with the reference track, next to the original choreography.
 
-### Core user flow
+### User flow (as built)
 
-1. Upload a practice video (phone recording, `.mov` / `.mp4`)
-2. Select or upload the reference track (the original song)
-3. DanceSync extracts the audio, detects the playback rate and alignment offset
-4. If the match is ambiguous (repeated chorus, low `peak_ratio`), show top-3 candidate alignments as thumbnails — the user picks the right one
-5. DanceSync re-times the video to original speed and delivers the synced result
-
----
-
-## Phase 1 — Production matcher
-
-**Goal:** A clean-room Python package that reproduces the spike's alignment accuracy, with a real test suite.
-
-### What to build
-
-```
-dancesync/
-├── __init__.py
-├── audio.py          # decode any supported format → mono float32 @ SR (wraps ffmpeg)
-├── features.py       # chroma_cqt extraction, per-dimension z-score normalization
-├── matcher.py        # sliding_correlation, peak finding, rate search, match()
-├── config.py         # all tunables: SR, HOP, RATES, MIN_OVERLAP_FRAC, PEAK_EXCLUDE_SEC
-└── types.py          # MatchResult dataclass (rate, offset_sec, score, peak_ratio, top_n)
-```
-
-### Key decisions
-
-- **Do not import from `spike/`.** Re-implement from the spike as a behavioral reference. The spike's code was written for speed-of-exploration, not for production use.
-- **`MatchResult` returns top-N candidates**, not just the winner. The UI needs this for the ambiguity fallback (Phase 4). Each candidate: `(rate, offset_sec, score, peak_ratio)`.
-- **Offsets are always in the original reference timeline.** This invariant carries forward from the spike.
-- **Caching stays.** Time-stretching a full song is tens of seconds; cache stretched reference features keyed on content hash (not mtime — production files may be re-uploaded with the same content).
-
-### Test suite
-
-```
-tests/
-├── test_matcher.py       # Tier A cases as pytest: known offset + rate recovery
-├── test_features.py      # frame↔sec round-trip, normalization properties
-├── test_audio.py         # format decode smoke tests (wav, mp3, m4a, mov container)
-└── conftest.py           # fixtures: generate synthetic clips (port spike/synth.py logic)
-```
-
-Minimum regression: the Tier A gate — every synthetic case recovers the correct rate and lands within 50 ms tolerance. Run with `pytest tests/`. The `--demo` equivalent is `pytest tests/test_matcher.py -k synthetic`.
-
-### Acceptance criteria
-
-- `pytest` passes with ≥ the spike's Tier A accuracy
-- `dancesync.matcher.match(clip_audio, ref_audio)` returns a `MatchResult` with top-3 candidates
-- All supported audio/video container formats decode correctly
-- No imports from `spike/`
+1. **Song:** pick a song used before, or upload a new one (an audio file, or a video of the choreography).
+2. **Video:** upload the practice video. The server aligns it, which takes 10–30 s.
+3. **Match:** this step appears only when the match is ambiguous (a repeated chorus, `peak_ratio` < 1.2). It shows the top 3 candidates on a song timeline and plays 8 s of the song at each one, and the user picks the right one.
+4. **Watch:** the synced take plays next to the reference video, with one play bar for both. The sound can be the song or the room (the phone's own recording). The user can download the take on its own or the side-by-side version.
 
 ---
 
-## Phase 2 — Backend API
+## Status
 
-**Goal:** A FastAPI server that accepts uploads and runs alignment jobs.
+| Phase | Status |
+|---|---|
+| 1. Production matcher | Done |
+| 2. Backend API | Done |
+| 3. Video sync engine | Done |
+| 4. Web UI | Done |
+| 5. Polish & deploy | Not started; the items marked **MVP** are what's left before the MVP is done |
+| Post-MVP features | Specced in [`specs/`](specs/) |
 
-### What to build
-
-```
-server/
-├── main.py               # FastAPI app, CORS, lifespan
-├── routes/
-│   ├── references.py     # POST /references (upload), GET /references
-│   ├── clips.py          # POST /clips (upload + auto-align), GET /clips/{id}
-│   └── align.py          # POST /align (manual re-align with user-selected candidate)
-├── models.py             # Pydantic models: Reference, Clip, AlignmentResult
-├── storage.py            # local filesystem storage for uploaded media (abstracted for later cloud swap)
-├── worker.py             # alignment job runner (sync first, background queue later)
-└── config.py             # server config: upload limits, storage paths, allowed origins
-```
-
-### Key decisions
-
-- **Sync processing first.** A 3-minute song aligns in ~10–30 seconds. For v1, the POST blocks and returns the result. Background queue (Celery/ARQ) is Phase 5 polish.
-- **Storage is local filesystem** behind an abstract interface. The abstraction exists so Phase 5 can swap in S3/GCS without touching routes.
-- **Upload limits:** reference tracks ≤ 50 MB, clips ≤ 500 MB (phone video). Validate content type and duration server-side.
-- **CORS** configured for the frontend origin from the start.
-
-### API shape
-
-```
-POST   /api/references          # upload a reference track
-GET    /api/references          # list uploaded references
-POST   /api/clips               # upload a practice video → auto-align → return top-N matches
-GET    /api/clips/{id}          # get clip details + alignment result
-POST   /api/clips/{id}/select   # user selects the correct candidate from top-N
-GET    /api/clips/{id}/synced   # download the re-timed video (Phase 3)
-```
-
-### Acceptance criteria
-
-- Upload a reference track and a clip via the API
-- Receive a JSON response with top-3 alignment candidates (rate, offset, score, peak_ratio)
-- Select a candidate; the selection persists
-- `pytest` for route tests with synthetic audio fixtures
+pytest covers the Tier A matcher regression, the ambiguity threshold, the API routes, and real ffmpeg renders. Vitest covers the UI's pure helpers in `web/src/flow.js`.
 
 ---
 
-## Phase 3 — Video sync engine
+## Phases 1–4: what was built
 
-**Goal:** Given an alignment result (rate + offset), produce a re-timed video synced to the original-speed reference.
+Where the build departed from the original plan, the difference is noted here. The code is the source of truth, not this file.
 
-### What to build
+### Phase 1 — Production matcher (`dancesync/`)
 
-```
-dancesync/
-└── sync.py               # ffmpeg pipeline: extract audio, retime video, mux with reference
-```
+Built as planned: chroma CQT features, overlap-normalized sliding correlation, and a rate search over `RATES = (1.0, 0.75, 0.5)`. `MatchResult` carries the top-N candidates, and every offset is in the original timeline. Stretched reference features are cached by content hash. The Tier A cases are the pytest regression suite.
 
-### Pipeline
+- **Added:** `AMBIGUOUS_PEAK_RATIO = 1.2`, set from measurements. A chorus repeated word for word scores 1.04–1.06, and passages heard once score 1.15–2.0. `tests/test_ambiguity.py` guards the threshold.
 
-1. **Extract audio** from the practice video (already done by the matcher, but may need the video stream separately)
-2. **Speed-adjust the video** — the practice video was filmed at `rate` speed, so speed it up by `1/rate` (e.g., 0.75x practice → 1.333x speedup) using ffmpeg's `setpts` and `atempo` filters
-3. **Trim** — the video starts at `offset_sec` in the reference, so the output starts there too; trim the reference audio to match the video duration
-4. **Mux** — combine the sped-up video with the reference audio starting at the aligned offset
-5. **Output** — `.mp4` with H.264 video + AAC audio, web-playable
+### Phase 2 — Backend API (`server/`)
 
-### Key decisions
+Built as planned: FastAPI, local storage keyed by content hash, alignment done synchronously inside the POST, and upload limits of 100 MB for songs and 500 MB for clips.
 
-- **ffmpeg subprocess, not a Python binding.** `ffmpeg-python` or raw subprocess calls. The pipeline is a single complex ffmpeg command, not frame-by-frame processing.
-- **No frame-level sync in v1.** The alignment is audio-based; video frames are resampled by ffmpeg's `setpts`. This is good enough for dance practice review. Frame-accurate sync (e.g., compensating for variable phone camera frame rates) is a future optimization.
-- **Preserve original video quality.** Use `-crf 18` or similar; the user's phone footage is their source of truth.
+- **Metadata** lives in a catalog of JSON files (`server/catalog.py`), kept apart from the raw file bytes (`server/storage.py`) so that either one can be replaced on its own.
+- **`AlignmentResult.ambiguous`** is decided once, at upload. `peak_ratio` is `null` in JSON when no other peak competes; that's how the matcher's infinity comes through.
+- **`GET /api/references/{id}/media`** serves the song file, with range requests, for the match previews and the side-by-side player.
+- **References are listed newest first.**
 
-### Acceptance criteria
+Endpoints:
+- `POST /api/references`, `GET /api/references`, `GET /api/references/{id}/media`
+- `POST /api/clips`, `GET /api/clips/{id}`, `POST /api/clips/{id}/select`
+- `GET|HEAD /api/clips/{id}/synced?sound=song|room&layout=take|side-by-side`
 
-- Given a clip, reference, rate, and offset: produce a watchable `.mp4` where the dancer's movements are at original speed and the reference audio is in sync
-- Output plays correctly in browser `<video>` tags (H.264 baseline profile, AAC-LC)
-- Processing time < 2x the clip duration for a 1080p input
+### Phase 3 — Video sync engine (`dancesync/sync.py`, `dancesync/ffmpeg.py`)
 
----
+Built as planned: one ffmpeg command per render, `setpts=PTS*rate`, and the reference cut at `offset_sec`, preceded by silence when the offset is negative. Output is H.264 baseline at CRF 18 with AAC audio.
 
-## Phase 4 — Web UI
+- **Every captured frame is kept** (`-fps_mode passthrough`). A 30 fps take at 0.75x comes out at 40 fps instead of losing frames.
+- **Two sounds:** `song` (the reference track) or `room` (the phone's own recording, sped up with `atempo`).
+- **Two layouts:** `take` alone, or `side-by-side`, with the reference video on the left. Both videos are scaled to 720 px high and put on a 60 fps grid.
+- **Renders are cached** under a filename that encodes every input. Each one is written to a temp file and then renamed, so a failed render never looks finished.
+- **`HEAD` on `/synced` renders without sending a body.** The UI waits on it because iOS Safari doesn't fetch a `<video>` source until the user presses play.
 
-**Goal:** A web frontend for the upload → align → review → download flow.
+### Phase 4 — Web UI (`web/`)
 
-### What to build
+Built with React 19, Vite, and plain CSS, and no other runtime dependencies. Vite proxies `/api`, so the browser only ever talks to one origin.
 
-```
-web/
-├── index.html
-├── src/
-│   ├── App.jsx           # or App.tsx — framework TBD
-│   ├── components/
-│   │   ├── Upload.jsx        # drag-and-drop upload for reference + clip
-│   │   ├── AlignmentReview.jsx   # show top-N candidates with score-curve viz
-│   │   ├── CandidateCard.jsx     # thumbnail + offset + peak_ratio for one candidate
-│   │   └── VideoPlayer.jsx       # side-by-side or synced playback of result
-│   └── api.js            # fetch wrappers for the backend
-└── package.json
-```
-
-### Key UX decisions
-
-- **Two-step upload:** (1) select or upload a reference track, (2) upload the practice video. The reference is reusable across clips.
-- **Alignment review screen:** Show the score curve plot (ported from the spike's `report.py`). Highlight the top-3 peaks. Each candidate gets a card with: offset timestamp, confidence (peak_ratio), and a short audio preview (a few seconds of the reference at that offset) so the user can hear which part of the song it matched to.
-- **Ambiguity handling:** If `peak_ratio` is high (clear winner), skip straight to the result. If it's low, show the candidates and ask the user to pick. This is the spec's "top-3-thumbnails fallback UX."
-- **Result screen:** Play the synced video. Offer download.
-
-### Framework decision
-
-Leave to implementer's preference. React (Vite) is the safe default. The UI is simple enough that vanilla JS + a small component library would also work. The important thing is that it's a SPA that talks to the FastAPI backend.
-
-### Acceptance criteria
-
-- Upload a reference + clip through the browser
-- See alignment candidates with scores
-- Select a candidate (or auto-select if unambiguous)
-- Play and download the synced video
-- Responsive layout (works on phone for quick review, desktop for detailed work)
+- **Step flow:** Song → Video → Match (only when ambiguous) → Watch.
+- **Match screen:** changed from the plan. A song timeline with candidate markers and 8 s audio previews replaced the score-curve plot and video thumbnails.
+- **Watch screen:**
+  - The take and the reference share one play bar. The take sets the time, and the reference follows it by nudging its `playbackRate` (`useLinkedPlayback.js`).
+  - The screen also has the Song/Room toggle and the download buttons.
+- **Pure helpers** live in `web/src/flow.js`, with Vitest tests.
 
 ---
 
 ## Phase 5 — Polish & deploy
 
-**Goal:** Production-readiness.
-
-### Tasks
-
-- **Error handling:** Meaningful error messages for: unsupported formats, too-short clips, alignment failure (no strong peak), ffmpeg missing
-- **Progress feedback:** WebSocket or SSE for alignment + video processing progress (replace the blocking POST from Phase 2)
-- **Background processing:** Move alignment + sync to a task queue (ARQ or Celery) so the API returns immediately with a job ID
-- **Containerization:** Dockerfile with ffmpeg, Python deps, and the web UI served from the same container (or a simple nginx + uvicorn split)
-- **Storage migration:** Swap local filesystem for cloud storage (S3/GCS) behind the existing abstraction
-- **Hosting:** Deploy to a single VPS (Fly.io, Railway, or similar) for v1. No multi-region, no auto-scaling yet.
-- **Benchmark harness:** Port the spike spec's "week-8 benchmark harness" idea — a suite of real-world test clips with ground truth, run as CI to catch matcher regressions
-
-### Acceptance criteria
-
-- `docker compose up` starts the full stack
-- Upload → align → sync → download works end-to-end in the browser
-- CI runs the matcher regression suite on every PR
-
----
-
-## Phase ordering and dependencies
-
-```
-Phase 1 (matcher)
-  └─→ Phase 2 (API)
-        ├─→ Phase 3 (video sync) — can start once API accepts uploads
-        └─→ Phase 4 (UI) — can start once API shape is stable
-              └─→ Phase 5 (polish) — after all pieces exist
-```
-
-Phases 3 and 4 can be developed in parallel once Phase 2's API shape is defined. Phase 1 is the foundation and must be done first.
+- **Tests in CI (MVP):** a GitHub Actions workflow that runs `pytest` and `npm --prefix web test` on every PR. Right now only the Claude workflows run.
+- **Error cases (MVP):** friendly messages already exist for files that are too big, unsupported file types, and an unreachable server. Still needed:
+  - clips too short to match
+  - no strong peak anywhere, meaning the alignment failed outright rather than being ambiguous. The UI should hand off to manual placement ([manual-alignment](specs/manual-alignment.md)) instead of stopping at an error.
+  - a startup check that stops the server if ffmpeg is missing
+- **One-command run (MVP):**
+  - a Dockerfile with ffmpeg and the Python dependencies
+  - FastAPI serving the built `web/dist`, so production stays on one origin like dev
+  - `docker compose up` to start the whole stack
+- **Access control:** a shared passphrase, or basic auth at the reverse proxy, before the server is reachable from the internet. This is required before YouTube import is exposed.
+- **Render cleanup:** renders in `.data/server/synced/` are never deleted. Cap their total size and delete the least recently used first.
+- **Background jobs and progress:** move alignment and rendering to a job queue that reports progress over server-sent events (SSE). Needed for:
+  - [follow-dancer](specs/follow-dancer.md), where tracking takes minutes
+  - any reverse proxy with a 60 s timeout in front of a long render
+- **Hosting:** a single small VPS, or a home machine reached over a private network. If YouTube import matters, test it from the chosen host, because YouTube often blocks datacenter IPs.
+- **Benchmark harness:** real-world clips with known correct offsets, run in CI to catch matcher regressions.
+- **Deferred: cloud storage (S3/GCS).** A self-hosted deployment for the owner and friends doesn't need it. `server/storage.py` stays separate so it can be swapped in later.
 
 ---
 
-## What to carry from the spike, what to leave
+## Post-MVP features
 
-### Carry (behavioral reference)
+These come from `TODO.md`, and each one has its own spec. Recommended order:
 
-- The chroma_cqt + z-score + sliding_correlation approach — it works
-- The two-timeline offset conversion (stretched → original)
-- Overlap normalization with the `MIN_OVERLAP_FRAC` floor
-- `peak_ratio` as the ambiguity signal and the top-3 fallback strategy
-- The Tier A test cases as regression fixtures
-- The tuning parameters in `config.py` (SR=22050, HOP=512, etc.)
+| # | Feature | Spec | Size | Depends on |
+|---|---|---|---|---|
+| 1 | Instant preview (watch before rendering) | [instant-preview.md](specs/instant-preview.md) | M | — |
+| 2 | Review speed on Watch (0.5× / 0.75× / 1×) | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
+| 3 | Manual alignment + speed tuning | [manual-alignment.md](specs/manual-alignment.md) | S–M | 1 |
+| 4 | Layouts: side by side, stacked, take only | [layouts.md](specs/layouts.md) | S | 1 (easier after) |
+| 5 | YouTube import | [youtube-import.md](specs/youtube-import.md) | S–M | access control before exposing it on the internet |
+| 6 | Basic editing: crop, mirror, rotate, trim | [video-editing.md](specs/video-editing.md) | M | 1 |
+| 7 | Takes at any practice speed | [practice-speeds.md](specs/practice-speeds.md) | M | — |
+| 8 | Follow one dancer | [follow-dancer.md](specs/follow-dancer.md) | L | 6, background jobs, **a spike first** |
 
-### Leave (spike-only concerns)
+- **1 comes first.** It's the speedup the user will notice most. It also means 2, 3, 4, and 6 only need changes to the preview, plus one render at download time.
+- **3 is the safety net.** It lets the user fix a match that's slightly off. Until 7 lands, it also covers takes at speeds the matcher doesn't try. And when alignment fails outright, the user can still place the take by hand.
+- **Move 7 up** if anyone regularly practices at speeds other than 0.75× and 0.5×, since tuning every take by hand gets old.
+- **8 is the only item with real technical risk.** Like the alignment work, it gets a go/no-go spike first. If the spike fails, there's a fallback that needs no computer vision: the user sets the crop by hand at a few points in the song.
 
-- The ingest CLI and manifest.json — the API replaces this
-- The report module's CSV/plot output — the UI replaces this
-- The `--demo` synthetic song generator — simplified into test fixtures
-- The `--stretch clip` alternative — worth revisiting later, not in v1
-- Any direct code import from `spike/`
+```
+instant-preview ─┬─→ review-speed
+                 ├─→ manual-alignment
+                 ├─→ layouts
+                 └─→ video-editing ──→ follow-dancer ←── background jobs (Phase 5)
+youtube-import        (independent)
+practice-speeds       (independent)
+```
