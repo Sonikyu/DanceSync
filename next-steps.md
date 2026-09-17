@@ -1,6 +1,6 @@
 # DanceSync — Build Plan
 
-The alignment spike validated the approach, and the MVP (Phases 1–4) is built: upload a song and a practice video, align them, confirm the match when it's ambiguous, and watch or download the synced result. What's left is Phase 5 (polish and deployment) and the post-MVP features. Each feature is specced in [`specs/`](specs/) so it can be handed to Claude Code as a self-contained task.
+The alignment spike validated the approach, and the MVP (Phases 1–4) is built: upload a song and a practice video, align them, confirm the match when it's ambiguous, and watch or download the synced result. What's left is Phase 5 (polish and deployment) and the post-MVP features. Each feature is specced in [`specs/`](specs/) so it can be handed to Claude Code as a self-contained task, and each spec is broken into day-sized tickets in [`tickets/`](tickets/). **This file holds status and rationale; [`tickets/README.md`](tickets/README.md) holds the working order.**
 
 **Audience:** the owner and friends, running DanceSync locally or self-hosted rather than as a public site. That shapes Phase 5, which needs basic access control but nothing for multiple tenants, and it's what makes YouTube import viable.
 
@@ -82,6 +82,8 @@ Built with React 19, Vite, and plain CSS, and no other runtime dependencies. Vit
 ---
 
 ## Phase 5 — Polish & deploy
+
+Ticketed as three separate tracks — Ship (what's left before the MVP is done), Operate, and Platform. See [`tickets/README.md`](tickets/README.md).
 
 - **Tests in CI (MVP):** a GitHub Actions workflow that runs `pytest` and `npm --prefix web test` on every PR. Right now only the Claude workflows run.
 - **Error cases (MVP):** friendly messages already exist for files that are too big, unsupported file types, and an unreachable server. Still needed:
