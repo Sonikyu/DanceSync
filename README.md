@@ -112,6 +112,7 @@ Open http://localhost:8000. A single container serves both the web app and the A
 - **Your files live in two Docker volumes.** `data` holds uploads, their metadata, and renders. `cache` holds decoded audio and song features, and it's safe to delete. Both survive `docker compose down` and rebuilds. Only `docker compose down -v` deletes them.
 - **Updating:** `git pull && docker compose up -d --build`.
 - **Logs:** `docker compose logs -f`.
+- **Hosting it on a server** for friends: follow [docs/hosting.md](docs/hosting.md).
 - **Before you put it on the internet,** set `DANCESYNC_PASSPHRASE` in `.env` and run `docker compose up -d` again. Everyone then signs in once with that passphrase, and stays signed in for 30 days on that browser.
 
 ---

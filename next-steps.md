@@ -96,7 +96,7 @@ Ticketed as three separate tracks — Ship (what's left before the MVP is done),
 - **Background jobs and progress:** move alignment and rendering to a job queue that reports progress over server-sent events (SSE). Needed for:
   - [follow-dancer](specs/follow-dancer.md), where tracking takes minutes
   - any reverse proxy with a 60 s timeout in front of a long render
-- **Hosting:** a single small VPS, or a home machine reached over a private network. If YouTube import matters, test it from the chosen host, because YouTube often blocks datacenter IPs.
+- **Hosting:** runbook in [`docs/hosting.md`](docs/hosting.md): a small VPS with Docker and Caddy (600 s proxy timeouts, from measured render times), or a home machine over Tailscale. The YouTube-from-this-host test waits until YouTube import exists.
 - **Benchmark harness:** real-world clips with known correct offsets, run in CI to catch matcher regressions.
 - **Deferred: cloud storage (S3/GCS).** A self-hosted deployment for the owner and friends doesn't need it. `server/storage.py` stays separate so it can be swapped in later.
 

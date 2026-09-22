@@ -39,6 +39,7 @@ DanceSync/
 │       ├── api.js            # fetch/XHR wrappers + dancer-facing error messages
 │       └── components/       # one component per step, plus the player pieces
 ├── tests/                    # pytest: Tier A matcher regression, ambiguity, API, real renders
+├── docs/hosting.md           # runbook: VPS + Docker + Caddy, timeouts, backups, updates
 ├── specs/                    # one spec per post-MVP feature
 ├── spike/                    # alignment spike (validated; reference only, never imported)
 ├── next-steps.md             # status + roadmap
