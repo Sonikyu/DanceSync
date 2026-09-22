@@ -70,6 +70,12 @@ button:focus-visible, a:focus-visible, .dropzone:focus-within { outline: 2px sol
 .actions { display: flex; gap: 12px; margin-top: auto; padding-top: 16px; }
 .actions > * { flex: 1; }
 
+/* --- Sign in --- */
+
+.field { height: 44px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; }
+.field:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.button:disabled { opacity: 0.5; cursor: default; }
+
 /* --- Song list --- */
 
 .list { margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); list-style: none; }

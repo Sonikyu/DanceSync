@@ -24,11 +24,12 @@ DanceSync/
 │   └── ffmpeg.py             # how to run ffmpeg: presence check, probe, encoder args, atomic writes
 ├── server/                   # FastAPI app
 │   ├── main.py               # app, CORS, routers
-│   ├── routes/               # references, clips, align (candidate select), synced
+│   ├── routes/               # session (sign-in), references, clips, align (candidate select), synced
 │   ├── models.py             # Pydantic request/response bodies + persisted records
 │   ├── storage.py            # raw bytes on disk, keyed by content hash
 │   ├── catalog.py            # JSON metadata records (kept separate from storage)
 │   ├── worker.py             # align_clip / sync_clip (synchronous for now)
+│   ├── auth.py               # shared-passphrase sign-in: session cookie + middleware (off when unset)
 │   ├── web.py                # serves the built web/dist at / (when it exists), behind /api
 │   └── config.py             # storage root, upload limits, CORS origins, web dist (DANCESYNC_* env overrides)
 ├── web/                      # React 19 + Vite SPA
@@ -98,6 +99,7 @@ docker compose up -d --build                          # production-style: one co
 - **Two `<video>` elements never stay in lockstep on their own.** One is the clock, and the other is steered: small `playbackRate` nudges, with a seek only past 0.5 s of drift. Seeking on every drift stalls on keyframe decodes.
 - **Re-timed takes have unusual frame rates.** A 30 fps clip at 0.75x becomes 40 fps. `-fps_mode passthrough` and `-enc_time_base:v filter` keep every frame, because resampling to 30 visibly stutters. The side-by-side render puts both inputs on a 60 fps grid before `hstack`.
 - **`peak_ratio` can be infinite** when nothing competes with the winner. The API sends it as `null`.
+- **With `DANCESYNC_PASSPHRASE` set, every `/api` call needs the session cookie.** `<video>`/`<audio>` send it on range requests because everything is same-origin; a cross-origin frontend would need credentialed CORS.
 - **The full pytest run takes about a minute,** because the sync tests render real video. librosa's "empty frequency set" warnings on synthetic audio are expected.
 
 ## Coding style

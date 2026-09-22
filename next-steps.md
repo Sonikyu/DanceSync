@@ -91,7 +91,7 @@ Ticketed as three separate tracks — Ship (what's left before the MVP is done),
   - no strong peak anywhere, meaning the alignment failed outright rather than being ambiguous. The UI should hand off to manual placement ([manual-alignment](specs/manual-alignment.md)) instead of stopping at an error.
   - ~~a startup check that stops the server if ffmpeg is missing~~ (done)
 - **One-command run (MVP):** done. A multi-stage `Dockerfile` (Node builds `web/dist`, Python 3.11 slim with ffmpeg runs it), FastAPI serving that build from the API's origin (`server/web.py`), and `docker compose up` with named volumes for data and cache. Settings come from `DANCESYNC_*` env vars (`.env.example`).
-- **Access control:** a shared passphrase, or basic auth at the reverse proxy, before the server is reachable from the internet. This is required before YouTube import is exposed.
+- **Access control:** done. Set `DANCESYNC_PASSPHRASE` and every `/api` request needs the cookie from `POST /api/session`; the web app shows a sign-in screen. Unset means no sign-in, as before.
 - **Render cleanup:** renders in `.data/server/synced/` are never deleted. Cap their total size and delete the least recently used first.
 - **Background jobs and progress:** move alignment and rendering to a job queue that reports progress over server-sent events (SSE). Needed for:
   - [follow-dancer](specs/follow-dancer.md), where tracking takes minutes

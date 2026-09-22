@@ -34,4 +34,6 @@ ENV DANCESYNC_STORAGE_ROOT=/data \
 VOLUME ["/data", "/cache"]
 
 EXPOSE 8000
-CMD ["sh", "-c", "exec uvicorn server.main:app --host 0.0.0.0 --port \"$PORT\""]
+# --forwarded-allow-ips: trust the reverse proxy's X-Forwarded-Proto, so the
+# sign-in cookie is marked Secure behind HTTPS.
+CMD ["sh", "-c", "exec uvicorn server.main:app --host 0.0.0.0 --port \"$PORT\" --forwarded-allow-ips '*'"]

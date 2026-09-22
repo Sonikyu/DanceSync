@@ -51,3 +51,11 @@ class Clip(BaseModel):
 
 class SelectCandidateRequest(BaseModel):
     index: int
+
+
+class SignInRequest(BaseModel):
+    passphrase: str
+
+
+class SessionStatus(BaseModel):
+    signed_in: bool

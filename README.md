@@ -112,7 +112,7 @@ Open http://localhost:8000. A single container serves both the web app and the A
 - **Your files live in two Docker volumes.** `data` holds uploads, their metadata, and renders. `cache` holds decoded audio and song features, and it's safe to delete. Both survive `docker compose down` and rebuilds. Only `docker compose down -v` deletes them.
 - **Updating:** `git pull && docker compose up -d --build`.
 - **Logs:** `docker compose logs -f`.
-- **Before you put it on the internet,** read [Using it from your phone](#using-it-from-your-phone): the app has no password yet.
+- **Before you put it on the internet,** set `DANCESYNC_PASSPHRASE` in `.env` and run `docker compose up -d` again. Everyone then signs in once with that passphrase, and stays signed in for 30 days on that browser.
 
 ---
 
@@ -127,7 +127,7 @@ npm --prefix web run dev -- --host
 Vite then prints a `Network:` address such as `http://192.168.1.23:5173/`. Open it on a phone that's on the same Wi-Fi. The API server doesn't need any changes, because the web app forwards to it.
 
 - Use the numeric address Vite prints. Vite rejects hostnames like `my-mac.local` with "Blocked request. This host is not allowed."
-- Only do this on a network you trust. Anyone on it can open the app, and it has no password yet.
+- Only do this on a network you trust. Anyone on it can open the app, unless you start the API with a passphrase: `DANCESYNC_PASSPHRASE=… .venv/bin/uvicorn server.main:app --port 8000`.
 
 ---
 

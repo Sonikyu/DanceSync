@@ -5,9 +5,29 @@ const UNREACHABLE = "Can't reach the DanceSync server. Is it running?";
 
 // The server's error text is written for developers; these are for dancers.
 const MESSAGES = {
+  401: "You've been signed out. Reload the page to sign in again.",
   413: "That file's too big. Songs can be up to 100 MB and videos up to 500 MB.",
   415: "That file type isn't supported. Use a video (.mp4, .mov) or audio file (.mp3, .m4a, .wav).",
 };
+
+// `{ signed_in }`. Always true when the server has no passphrase set.
+export function getSession() {
+  return request("/api/session");
+}
+
+// Resolves on success. The session cookie it sets covers every later
+// request, including the range requests <video> and <audio> make.
+export async function signIn(passphrase) {
+  const resp = await fetch("/api/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ passphrase }),
+  }).catch(() => {
+    throw new Error(UNREACHABLE);
+  });
+  if (resp.status === 401) throw new Error("That's not the passphrase. Try again.");
+  if (!resp.ok) throw new Error("Something went wrong on the server. Try again.");
+}
 
 export function listReferences() {
   return request("/api/references");

@@ -20,3 +20,8 @@ ALLOWED_ORIGINS = os.environ.get(
 
 # The output of `npm --prefix web run build`. Served at / when it exists.
 WEB_DIST = Path(os.environ.get("DANCESYNC_WEB_DIST", ROOT / "web" / "dist"))
+
+# One shared passphrase for the owner and friends. Unset means no sign-in at
+# all, which is right for a laptop and wrong for anything on the internet.
+PASSPHRASE = os.environ.get("DANCESYNC_PASSPHRASE") or None
+SESSION_DAYS = 30
