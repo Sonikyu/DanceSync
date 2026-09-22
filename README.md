@@ -4,7 +4,7 @@ Practice to slowed-down music, then review at full speed.
 
 A dancer plays a song at reduced speed (say 0.75×) on a laptop and films themselves on a phone. DanceSync works out which part of the song the recording covers and how fast it was playing. It then re-times the video to the original tempo and puts the original track under it, next to the choreography video if there is one.
 
-> **For now, DanceSync runs on your own computer.** Hosting it as a web app is planned; see Phase 5 in [next-steps.md](next-steps.md).
+> **Two ways to run it:** from source on your own computer (below), or as a single Docker container that you can also host on a server ([Running it with Docker](#running-it-with-docker)).
 
 ## How it works
 
@@ -94,6 +94,25 @@ Songs you've uploaded stay in the list the next time you start the app.
 ### Stopping
 
 Press **Ctrl+C** in each terminal.
+
+---
+
+## Running it with Docker
+
+On any machine that has [Docker](https://docs.docker.com/get-docker/), this is all it takes. The Docker image includes ffmpeg and the built web app, so you don't need to install Python or Node:
+
+```bash
+git clone https://github.com/Sonikyu/DanceSync.git && cd DanceSync
+cp .env.example .env              # optional: change the port or upload limits
+docker compose up -d --build
+```
+
+Open http://localhost:8000. A single container serves both the web app and the API on one port.
+
+- **Your files live in two Docker volumes.** `data` holds uploads, their metadata, and renders. `cache` holds decoded audio and song features, and it's safe to delete. Both survive `docker compose down` and rebuilds. Only `docker compose down -v` deletes them.
+- **Updating:** `git pull && docker compose up -d --build`.
+- **Logs:** `docker compose logs -f`.
+- **Before you put it on the internet,** read [Using it from your phone](#using-it-from-your-phone): the app has no password yet.
 
 ---
 

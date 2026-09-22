@@ -1,4 +1,5 @@
-"""FastAPI app: startup checks, CORS, router registration, storage directory setup."""
+"""FastAPI app: startup checks, CORS, router registration, storage directory
+setup, and the built web app."""
 
 from __future__ import annotations
 
@@ -10,8 +11,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from dancesync.ffmpeg import ffmpeg_version, require_ffmpeg
-from server.config import ALLOWED_ORIGINS, STORAGE_ROOT
+from server.config import ALLOWED_ORIGINS, STORAGE_ROOT, WEB_DIST
 from server.routes import align, clips, references, synced
+from server.web import mount_web_app
 
 
 log = logging.getLogger("uvicorn.error")
@@ -44,3 +46,6 @@ app.include_router(references.router)
 app.include_router(clips.router)
 app.include_router(align.router)
 app.include_router(synced.router)
+
+# Last, so its catch-all route never shadows an API route.
+mount_web_app(app, WEB_DIST)

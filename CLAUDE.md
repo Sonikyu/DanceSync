@@ -29,7 +29,8 @@ DanceSync/
 │   ├── storage.py            # raw bytes on disk, keyed by content hash
 │   ├── catalog.py            # JSON metadata records (kept separate from storage)
 │   ├── worker.py             # align_clip / sync_clip (synchronous for now)
-│   └── config.py             # storage root, upload limits, CORS origins
+│   ├── web.py                # serves the built web/dist at / (when it exists), behind /api
+│   └── config.py             # storage root, upload limits, CORS origins, web dist (DANCESYNC_* env overrides)
 ├── web/                      # React 19 + Vite SPA
 │   └── src/
 │       ├── App.jsx           # step machine: song → video → match (only if ambiguous) → watch
@@ -57,6 +58,8 @@ npm --prefix web run dev                              # UI on :5173, proxies /ap
 .venv/bin/python -m pytest                            # full suite, ~1 min (renders real video)
 .venv/bin/python -m pytest tests/test_matcher.py      # Tier A regression only
 npm --prefix web test                                 # Vitest
+
+docker compose up -d --build                          # production-style: one container on :8000, API + built web app
 ```
 
 `.claude/launch.json` defines the `api` and `web` preview servers, plus `api-8001` and `web-8001` for running a second copy. The spike has its own CLI (`python -m spike.tier_a`, `spike.ingest`), documented in `spike/README.md`. You only need it when revisiting the experiment.

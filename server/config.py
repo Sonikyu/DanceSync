@@ -1,13 +1,22 @@
-"""Server config: storage location, upload limits, CORS origins."""
+"""Server config: storage location, upload limits, CORS origins, and where the
+built web app lives. Each one can be overridden by a DANCESYNC_* environment
+variable, which is how the Docker image points them at its volumes."""
 
+import os
 from pathlib import Path
 
-STORAGE_ROOT = Path(__file__).resolve().parent.parent / ".data" / "server"
+ROOT = Path(__file__).resolve().parent.parent
 
-MAX_REFERENCE_BYTES = 100 * 1024 * 1024
-MAX_CLIP_BYTES = 500 * 1024 * 1024
+STORAGE_ROOT = Path(os.environ.get("DANCESYNC_STORAGE_ROOT", ROOT / ".data" / "server"))
 
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-]
+MAX_REFERENCE_BYTES = int(os.environ.get("DANCESYNC_MAX_REFERENCE_MB", 100)) * 1024 * 1024
+MAX_CLIP_BYTES = int(os.environ.get("DANCESYNC_MAX_CLIP_MB", 500)) * 1024 * 1024
+
+# Only needed when the web app is served from a different origin than the
+# API. The Vite dev proxy and the built app served by FastAPI both avoid that.
+ALLOWED_ORIGINS = os.environ.get(
+    "DANCESYNC_CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
+).split(",")
+
+# The output of `npm --prefix web run build`. Served at / when it exists.
+WEB_DIST = Path(os.environ.get("DANCESYNC_WEB_DIST", ROOT / "web" / "dist"))

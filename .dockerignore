@@ -1,0 +1,17 @@
+# Only the source the image needs; never media or local state.
+.git
+.github
+.claude
+.venv
+.data
+.cache
+**/__pycache__
+*.egg-info
+.pytest_cache
+.env
+web/node_modules
+web/dist
+spike
+tests
+specs
+tickets

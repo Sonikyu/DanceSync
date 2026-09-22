@@ -5,6 +5,7 @@ stay correct (frame size, rate list, overlap floor). Change them here, not at
 call sites.
 """
 
+import os
 from pathlib import Path
 
 # --- Audio / feature parameters -------------------------------------------
@@ -59,7 +60,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # Cached decoded audio and time-stretched reference features. Keyed on content
 # hash rather than mtime, since uploaded files may be re-uploaded with the
 # same bytes but a fresh mtime.
-CACHE_DIR = ROOT / ".cache" / "dancesync"
+CACHE_DIR = Path(os.environ.get("DANCESYNC_CACHE_DIR", ROOT / ".cache" / "dancesync"))
 
 
 def ensure_cache_dir() -> None:
