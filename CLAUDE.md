@@ -123,7 +123,7 @@ The owner of this repo reviews and debugs every line. Write code they can read i
 
 ## GitHub Actions
 
-Both workflows in `.github/workflows/` run `anthropics/claude-code-action@v1` with the `CLAUDE_CODE_OAUTH_TOKEN` secret. `claude.yml` responds to `@claude` in issue and PR comments, and `claude-code-review.yml` auto-reviews every PR through the `code-review@claude-code-plugins` plugin. No workflow runs the test suites yet; that's a Phase 5 item.
+`test.yml` runs `pytest` (with ffmpeg installed), Vitest, and a `web` build on every PR and on pushes to `main`. The other two workflows run `anthropics/claude-code-action@v1` with the `CLAUDE_CODE_OAUTH_TOKEN` secret. `claude.yml` responds to `@claude` in issue and PR comments, and `claude-code-review.yml` auto-reviews every PR through the `code-review@claude-code-plugins` plugin.
 
 ## Roadmap
 

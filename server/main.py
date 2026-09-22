@@ -1,18 +1,32 @@
-"""FastAPI app: CORS, router registration, storage directory setup."""
+"""FastAPI app: startup checks, CORS, router registration, storage directory setup."""
 
 from __future__ import annotations
 
+import logging
+import shutil
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from dancesync.ffmpeg import ffmpeg_version, require_ffmpeg
 from server.config import ALLOWED_ORIGINS, STORAGE_ROOT
 from server.routes import align, clips, references, synced
 
 
+log = logging.getLogger("uvicorn.error")
+
+
+def check_ffmpeg() -> None:
+    """Stop the server at startup, not deep inside the first upload, when
+    ffmpeg is missing. `require_ffmpeg` raises with the install hint."""
+    require_ffmpeg()
+    log.info("Using %s (%s)", shutil.which("ffmpeg"), ffmpeg_version())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    check_ffmpeg()
     STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
     yield
 

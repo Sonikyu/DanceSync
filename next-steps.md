@@ -85,11 +85,11 @@ Built with React 19, Vite, and plain CSS, and no other runtime dependencies. Vit
 
 Ticketed as three separate tracks — Ship (what's left before the MVP is done), Operate, and Platform. See [`tickets/README.md`](tickets/README.md).
 
-- **Tests in CI (MVP):** a GitHub Actions workflow that runs `pytest` and `npm --prefix web test` on every PR. Right now only the Claude workflows run.
+- **Tests in CI (MVP):** done. `.github/workflows/test.yml` runs `pytest` and `npm --prefix web test` on every PR.
 - **Error cases (MVP):** friendly messages already exist for files that are too big, unsupported file types, and an unreachable server. Still needed:
   - clips too short to match
   - no strong peak anywhere, meaning the alignment failed outright rather than being ambiguous. The UI should hand off to manual placement ([manual-alignment](specs/manual-alignment.md)) instead of stopping at an error.
-  - a startup check that stops the server if ffmpeg is missing
+  - ~~a startup check that stops the server if ffmpeg is missing~~ (done)
 - **One-command run (MVP):**
   - a Dockerfile with ffmpeg and the Python dependencies
   - FastAPI serving the built `web/dist`, so production stays on one origin like dev

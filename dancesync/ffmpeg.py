@@ -26,6 +26,12 @@ def require_ffmpeg() -> None:
         )
 
 
+def ffmpeg_version() -> str:
+    """The first line of `ffmpeg -version`, e.g. "ffmpeg version 7.1 ..."."""
+    proc = subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+    return _first_line(proc.stdout)
+
+
 def probe_video_duration(path: Path) -> float:
     """Seconds of video in `path`, before re-timing."""
     cmd = [
@@ -65,6 +71,11 @@ def run_to_file(cmd: list[str], out_path: Path, clip_name: str) -> None:
         tmp_path.unlink(missing_ok=True)
         raise SyncError(f"ffmpeg failed on {clip_name}: {_last_line(proc.stderr)}")
     tmp_path.replace(out_path)
+
+
+def _first_line(stdout: bytes) -> str:
+    lines = stdout.decode("utf-8", "replace").strip().splitlines()
+    return lines[0] if lines else "unknown version"
 
 
 def _last_line(stderr: bytes) -> str:
