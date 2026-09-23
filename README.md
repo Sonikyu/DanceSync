@@ -87,7 +87,9 @@ Leave both terminals open while you use the app. Errors from the server show up 
 1. **Choose your song:** upload the original track. An audio file works; a video of the choreography is better, because then you can watch your take beside it or under it.
 2. **Add your practice video:** the phone recording. Finding your place in the song takes 10–30 seconds, and the first take against a new song takes longer.
 3. **Which part did you dance?** You only see this screen if the song has repeated sections that sound alike. Play each candidate and pick yours.
-4. **Watch:** the synced take plays next to the reference. Switch between the song and the room sound, or download the video.
+4. **Watch:** the synced take plays next to the reference. Switch between the song and the room sound, slow it down, pick a layout, or download the video. If it's slightly out of sync, open **Fine-tune**: nudge the offset (or the practice speed, if it drifts), and pick **Both** under Sound to hear the song and the room together; they sound like one when they line up.
+
+If DanceSync can't find your take in the song at all, you can place it by hand: drag to roughly where it starts, then fine-tune by ear.
 
 Songs you've uploaded stay in the list the next time you start the app.
 

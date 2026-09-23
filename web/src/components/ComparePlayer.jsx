@@ -14,7 +14,8 @@ import useLinkedPlayback from "./useLinkedPlayback.js";
 // playing the song), and there's no layout to pick.
 //
 // `takeRate` re-times the take live (flow.takeRateFor), so a tuned rate or
-// offset plays at once without a new render.
+// offset plays at once without a new render. While `tuning`, Sound also
+// offers Both.
 //
 // Speed slows both down together for reviewing a fast passage. It starts at
 // 1× for every take and isn't saved.
@@ -26,6 +27,7 @@ export default function ComparePlayer({
   offsetSec,
   takeRate,
   sound,
+  tuning,
   onSoundChange,
   onReferenceVideo,
   layout,
@@ -88,7 +90,7 @@ export default function ComparePlayer({
         onSeek={linked.seek}
       />
       <div className="controls">
-        <SoundToggle sound={sound} onChange={onSoundChange} />
+        <SoundToggle sound={sound} withBoth={tuning} onChange={onSoundChange} />
         <Segmented label="Speed" options={SPEED_OPTIONS} value={speed} onChange={setSpeed} />
         {hasReferenceVideo && <LayoutToggle layout={layout} onChange={onLayoutChange} />}
       </div>
