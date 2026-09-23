@@ -1,8 +1,10 @@
+import { syncedVideoUrl } from "./api.js";
 import { describe, expect, test } from "vitest";
 import {
   chosenCandidate,
   clipTimeFor,
   clipTooShortMessage,
+  effectiveAlignment,
   formatRate,
   formatTime,
   layoutFor,
@@ -216,5 +218,25 @@ describe("layout", () => {
       expect(layoutFor({ picked: null, wideViewport, hasReferenceVideo: false })).toBe("take");
       expect(layoutFor({ picked: "stacked", wideViewport, hasReferenceVideo: false })).toBe("take");
     }
+  });
+});
+
+describe("manual alignment", () => {
+  const MANUAL = { rate: 0.8, offset_sec: 72.15 };
+
+  test("the effective alignment is manual when set, else the chosen candidate", () => {
+    expect(effectiveAlignment(clipWith({}))).toBe(CANDIDATES[0]);
+    expect(effectiveAlignment(clipWith({ selected_index: 1 }))).toBe(CANDIDATES[1]);
+    expect(effectiveAlignment(clipWith({ selected_index: 1, manual: MANUAL }))).toBe(MANUAL);
+  });
+
+  test("tuning changes the render's URL, and clearing it changes it back", () => {
+    const url = (clip) => syncedVideoUrl("clip", renderParams({ reference_id: "ref", ...clip }, "song", "take"));
+    const automatic = url(clipWith({}));
+    const tuned = url(clipWith({ manual: MANUAL }));
+
+    expect(tuned).not.toBe(automatic);
+    expect(tuned).toContain("rate=0.8&offset_sec=72.15");
+    expect(url(clipWith({ manual: null }))).toBe(automatic);
   });
 });

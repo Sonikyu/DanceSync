@@ -27,8 +27,7 @@ export function clipTooShortMessage(durationSec, minSec) {
   );
 }
 
-// The user's pick if they made one, else the matcher's best guess -- the same
-// rule the server applies when it renders.
+// The user's pick if they made one, else the matcher's best guess.
 function chosenIndex(clip) {
   return clip.alignment.selected_index ?? 0;
 }
@@ -37,14 +36,21 @@ export function chosenCandidate(clip) {
   return clip.alignment.top_candidates[chosenIndex(clip)];
 }
 
+// What the take plays at, as { rate, offset_sec }: the dancer's manual
+// alignment if they set one, else the chosen candidate. The same rule as the
+// server's effective_alignment, which renders with it.
+export function effectiveAlignment(clip) {
+  return clip.alignment.manual ?? chosenCandidate(clip);
+}
+
 // What a /synced render depends on, for api.syncedVideoUrl: the clip's song,
 // the alignment it plays at, and which render.
 export function renderParams(clip, sound, layout) {
-  const candidate = chosenCandidate(clip);
+  const alignment = effectiveAlignment(clip);
   return {
     reference_id: clip.reference_id,
-    rate: candidate.rate,
-    offset_sec: candidate.offset_sec,
+    rate: alignment.rate,
+    offset_sec: alignment.offset_sec,
     layout,
     sound,
   };

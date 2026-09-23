@@ -162,8 +162,11 @@ def flash_time_sec(video_path: Path) -> float:
 
 
 def wav_bytes(y: np.ndarray, sr: int = SR) -> bytes:
+    """32-bit integer PCM, not float: libsndfile stamps the current time into
+    a float WAV's PEAK chunk, so the same audio a second later gave different
+    bytes -- and a different content-hash id on upload."""
     buf = io.BytesIO()
-    sf.write(buf, y, sr, format="WAV", subtype="FLOAT")
+    sf.write(buf, y, sr, format="WAV", subtype="PCM_32")
     return buf.getvalue()
 
 

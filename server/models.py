@@ -34,17 +34,28 @@ class Reference(BaseModel):
     created_at: datetime
 
 
+class ManualAlignment(BaseModel):
+    """An alignment the dancer set by hand, which overrides the matcher's
+    without replacing it. `offset_sec` is in the ORIGINAL reference timeline,
+    like a candidate's. No score or peak_ratio: they mean nothing here."""
+
+    rate: float
+    offset_sec: float
+
+
 class AlignmentResult(BaseModel):
     """`ambiguous` and `failed` are decided once, at upload, against the
     matcher's `AMBIGUOUS_PEAK_RATIO` and `MIN_MATCH_SCORE`. The UI asks the
     user to pick a candidate when `ambiguous` is set, and says the take
-    wasn't found in the song when `failed` is. Records saved before `failed`
-    existed load as not failed."""
+    wasn't found in the song when `failed` is. `manual`, when set, wins over
+    the chosen candidate everywhere (`effective_alignment`). Records saved
+    before `failed` or `manual` existed load as not failed and not manual."""
 
     top_candidates: list[Candidate]
     ambiguous: bool
     failed: bool = False
     selected_index: int | None = None
+    manual: ManualAlignment | None = None
 
 
 class Clip(BaseModel):
@@ -65,6 +76,16 @@ class SignInRequest(BaseModel):
 
 class SessionStatus(BaseModel):
     signed_in: bool
+
+
+def effective_alignment(alignment: AlignmentResult) -> ManualAlignment | Candidate:
+    """What the take plays at: the dancer's manual alignment if they set one,
+    else their pick of the candidates, else the matcher's best guess.
+    `flow.effectiveAlignment` is the browser's copy of this rule."""
+    if alignment.manual is not None:
+        return alignment.manual
+    index = alignment.selected_index
+    return alignment.top_candidates[0 if index is None else index]
 
 
 class RenderParams(BaseModel):

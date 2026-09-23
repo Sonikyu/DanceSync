@@ -109,8 +109,6 @@ def test_references_listed_newest_first(client):
 
 
 def test_reference_media_served_with_range_support(client):
-    # libsndfile stamps the time into float WAV headers, so compare against
-    # these exact bytes rather than a second wav_bytes call.
     uploaded = wav_bytes(make_reference(duration_sec=20.0, seed=11))
     files = {"file": ("song.wav", uploaded, "audio/wav")}
     reference = client.post("/api/references", files=files).json()
@@ -210,8 +208,6 @@ def test_clip_media_serves_the_upload_with_range_support(client):
     ref_audio = make_reference(duration_sec=60.0, seed=22)
     reference = upload_reference(client, ref_audio)
     clip = make_clip(ref_audio, start_sec=10.0, duration_sec=15.0, rate=0.75, snr_db=10.0)
-    # One set of bytes, uploaded and compared: libsndfile stamps the time
-    # into float WAV headers, so a second wav_bytes call can differ.
     uploaded = wav_bytes(clip.audio)
     files = {"file": ("practice.wav", uploaded, "audio/wav")}
     body = client.post("/api/clips", params={"reference_id": reference["id"]}, files=files).json()
