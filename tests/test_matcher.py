@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dancesync.config import SR
+from dancesync.config import MIN_MATCH_SCORE, SR
 from dancesync.matcher import find_peaks, match, sliding_correlation
 from tests.conftest import make_clip
 
@@ -52,6 +52,8 @@ def test_synthetic_recovery(reference_audio, start, rate, snr):
 
     assert result.rate == pytest.approx(clip.true_rate, abs=1e-9)
     assert result.offset_sec == pytest.approx(clip.true_offset_sec, abs=TOLERANCE_SEC)
+    # A normal take is never reported as an outright failure.
+    assert result.score >= MIN_MATCH_SCORE
 
 
 def test_ambiguous_match_ranks_truth_in_top_candidates(reference_audio):

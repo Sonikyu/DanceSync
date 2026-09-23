@@ -23,9 +23,7 @@ There are two controls, one for each symptom:
   - When `manual` is set, it's used everywhere instead of the chosen candidate: in `_chosen_candidate` in `routes/synced.py` and in `chosenCandidate` in `flow.js`.
   - The matcher's candidates stay as they are, so **Reset to automatic** only has to clear `manual`.
 - **Offsets entered by hand are also in the original reference timeline** (invariant 1). The UI shows them as positions in the song.
-- **The server's render cache already handles tuning, but the browser's doesn't.**
-  - On the server, `_synced_id` is built from the rate and offset actually used, so a tuned render gets its own file.
-  - In the browser, `syncedVideoUrl` only carries the candidate index, so it would replay the cached untuned render. Add the rate and `offset_sec` to the query string (invariant 7).
+- **Both render caches already handle tuning, once the effective alignment feeds them.** Rate and offset are fields of `RenderParams` (DS-03), so they name the server's file and appear in the browser's `/synced` URL. A tuned render gets its own file and its own URL, as long as the route's `_render_params` and `flow.renderParams` both read the effective alignment rather than the chosen candidate (invariant 7).
 - **When alignment fails, this is where the user goes.** If no rate produces a usable match (see the Phase 5 error cases), the user doesn't hit a dead end. They drag the take onto the song timeline (`SongTimeline`) near where it starts, pick the practice speed, and then fine-tune. A later addition could be a **Snap** button that runs `match` at that rate, searching only within ±5 s of the rough position.
 
 ## API
@@ -67,7 +65,7 @@ web/src/components/useLinkedPlayback.js the "both" sound
 
 ## Tests
 
-- **API:** PUT and DELETE, validation errors, a render that uses the manual values, and a different `_synced_id` once the values are tuned.
+- **API:** PUT and DELETE, validation errors, a render that uses the manual values, and a different `render_cache_id` once the values are tuned.
 - **`flow.test.js`:** `effectiveAlignment`, and `syncedVideoUrl` changing when the values are tuned.
 - **Manual check:** at the correct offset, the Both sound blends into one.
 

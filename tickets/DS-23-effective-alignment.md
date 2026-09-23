@@ -10,7 +10,7 @@ Once `manual` exists, every consumer must prefer it over the chosen candidate �
 
 - `effectiveAlignment(clip)` in `flow.js` — manual if set, else the chosen candidate — with tests.
 - `_chosen_candidate` in `routes/synced.py` uses the effective alignment.
-- Rate and offset go into the render params record from DS-03, so they reach both the cache name and the query string (invariant 7).
+- Rate and offset are already `RenderParams` fields (DS-03), so they reach both the cache name and the query string. `_render_params` in `routes/synced.py` and `flow.renderParams` just need to read the effective alignment (invariant 7).
 
 ## Acceptance criteria
 

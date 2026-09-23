@@ -20,16 +20,19 @@ DanceSync/
 │   ├── features.py           # chroma_cqt + z-score, frames_to_sec
 │   ├── matcher.py            # sliding correlation, peaks, rate search, match()
 │   ├── types.py              # Candidate, MatchResult
-│   ├── sync.py               # what to render: ffmpeg filtergraphs for the synced / side-by-side video
+│   ├── sync.py               # what to render: ffmpeg filtergraphs for the synced take / compare (side-by-side, stacked) video
 │   └── ffmpeg.py             # how to run ffmpeg: presence check, probe, encoder args, atomic writes
 ├── server/                   # FastAPI app
 │   ├── main.py               # app, CORS, routers
-│   ├── routes/               # references, clips, align (candidate select), synced
+│   ├── routes/               # session (sign-in), references, clips, align (candidate select), synced
 │   ├── models.py             # Pydantic request/response bodies + persisted records
 │   ├── storage.py            # raw bytes on disk, keyed by content hash
 │   ├── catalog.py            # JSON metadata records (kept separate from storage)
 │   ├── worker.py             # align_clip / sync_clip (synchronous for now)
-│   └── config.py             # storage root, upload limits, CORS origins
+│   ├── render_cache.py       # LRU cap on rendered videos (mtime = last served); swept after each new render
+│   ├── auth.py               # shared-passphrase sign-in: session cookie + middleware (off when unset)
+│   ├── web.py                # serves the built web/dist at / (when it exists), behind /api
+│   └── config.py             # storage root, upload limits, CORS origins, web dist (DANCESYNC_* env overrides)
 ├── web/                      # React 19 + Vite SPA
 │   └── src/
 │       ├── App.jsx           # step machine: song → video → match (only if ambiguous) → watch
@@ -37,6 +40,7 @@ DanceSync/
 │       ├── api.js            # fetch/XHR wrappers + dancer-facing error messages
 │       └── components/       # one component per step, plus the player pieces
 ├── tests/                    # pytest: Tier A matcher regression, ambiguity, API, real renders
+├── docs/hosting.md           # runbook: VPS + Docker + Caddy, timeouts, backups, updates
 ├── specs/                    # one spec per post-MVP feature
 ├── spike/                    # alignment spike (validated; reference only, never imported)
 ├── next-steps.md             # status + roadmap
@@ -57,6 +61,8 @@ npm --prefix web run dev                              # UI on :5173, proxies /ap
 .venv/bin/python -m pytest                            # full suite, ~1 min (renders real video)
 .venv/bin/python -m pytest tests/test_matcher.py      # Tier A regression only
 npm --prefix web test                                 # Vitest
+
+docker compose up -d --build                          # production-style: one container on :8000, API + built web app
 ```
 
 `.claude/launch.json` defines the `api` and `web` preview servers, plus `api-8001` and `web-8001` for running a second copy. The spike has its own CLI (`python -m spike.tier_a`, `spike.ingest`), documented in `spike/README.md`. You only need it when revisiting the experiment.
@@ -67,12 +73,13 @@ npm --prefix web test                                 # Vitest
   1. `routes/clips.py` calls `storage.save`, which assigns a content-hash id.
   2. `worker.align_clip` decodes the audio with `audio.decode`.
   3. `matcher.precompute_ref_features` builds the stretched reference features, cached per reference id.
-  4. `matcher.match` produces the `AlignmentResult`: the top 3 candidates plus the `ambiguous` flag. It's saved in the catalog.
+  4. `matcher.match` produces the `AlignmentResult`: the top 3 candidates plus the `ambiguous` flag (`peak_ratio` < `AMBIGUOUS_PEAK_RATIO`) and the `failed` flag (winning score < `MIN_MATCH_SCORE`). It's saved in the catalog. Clips under `MIN_CLIP_SEC` are rejected with 422 before matching.
 - **Render** (runs on `HEAD`/`GET /api/clips/{id}/synced`):
   1. `routes/synced.py` picks the chosen candidate, or the best one if the user never picked.
-  2. `worker.sync_clip` calls `sync.render_synced` or `sync.render_side_by_side`.
+  2. The route builds a `RenderParams` from the clip's chosen candidate plus `sound`/`layout`, and `worker.sync_clip` calls `sync.render_synced` (layout `take`) or `sync.render_compare` (`side-by-side`, `stacked`) with it.
   3. `ffmpeg.run_to_file` writes the output. Its filename encodes every input, so an existing file is served as-is.
-- **Watch** (in the browser): `ComparePlayer` plays the rendered take and the reference media on one play bar. `useLinkedPlayback` treats the take as the clock and nudges the muted reference's `playbackRate` to keep up.
+  4. `render_cache.touch` marks it used; after a new render, `render_cache.sweep` deletes the least recently used renders past `RENDER_CACHE_MAX_BYTES`.
+- **Watch** (in the browser): `ComparePlayer` plays the rendered take and the reference media on one play bar. `useLinkedPlayback` treats the take as the clock and nudges the muted reference's `playbackRate` to keep up. Review speed (0.5×/0.75×/1×) sets both base rates through `flow.playbackRates`, and the nudge is around that base; downloads are unaffected. The layout (side by side, stacked, take only; `flow.layoutFor`) is a class on `.compare`, and the one Download button renders that layout and sound.
 
 `dancesync/` never imports from `server/`, and `server/` reaches the matcher and renderer only through `worker.py`.
 
@@ -84,7 +91,7 @@ npm --prefix web test                                 # Vitest
 4. **`peak_ratio` detects ambiguity.** Self-similar music (repeated choruses) produces tied peaks. `peak_ratio` is the winner divided by the best peak outside an exclusion window. At upload, `AMBIGUOUS_PEAK_RATIO` (1.2, measured) decides whether the user has to pick from the top 3.
 5. **Parameters live in config, not inline.** Several must agree across modules.
 6. **Renders and playback share one timing model.** Clip time `t` heard reference time `offset_sec + t × rate`. Output time `T` shows clip time `T / rate` over reference time `offset_sec + T`. `sync.py`'s module docstring states this for ffmpeg, and `flow.referenceTimeFor` states it for the browser. If you change one, change the other.
-7. **Render cache names encode every input.** `_synced_id` in `routes/synced.py` names each render after the clip, reference, rate, offset, layout, and sound. Anything new that changes the picture or audio (edits, layouts, speeds) must go into that name *and* into the URL query in `api.syncedVideoUrl`. Otherwise the server or the browser serves a stale file.
+7. **Render cache names encode every input.** Everything a render depends on is a field of `RenderParams` in `server/models.py`: clip, reference, rate, offset, layout, and sound. `render_cache_id` names the file after every field, and the browser's `/synced` URL carries every field too (`RENDER_PARAM_FIELDS` in `api.js`, filled by `flow.renderParams`). Anything new that changes the picture or audio (edits, layouts, speeds) is a new field there, added to `RENDER_PARAM_FIELDS` as well; `tests/test_render_params.py` fails if the two lists drift. Otherwise the server or the browser serves a stale file.
 
 ## Gotchas
 
@@ -93,8 +100,10 @@ npm --prefix web test                                 # Vitest
 - **Tier A failures are code bugs, not findings.** If the synthetic gate fails after a matcher change, the change broke something. Don't debug it with real recordings.
 - **iOS Safari won't fetch a `<video>` source until play is pressed.** So the UI sends a `HEAD` to `/synced` to trigger the render before handing the URL to the player. iOS also lets an element play unmuted only if a user gesture started it.
 - **Two `<video>` elements never stay in lockstep on their own.** One is the clock, and the other is steered: small `playbackRate` nudges, with a seek only past 0.5 s of drift. Seeking on every drift stalls on keyframe decodes.
-- **Re-timed takes have unusual frame rates.** A 30 fps clip at 0.75x becomes 40 fps. `-fps_mode passthrough` and `-enc_time_base:v filter` keep every frame, because resampling to 30 visibly stutters. The side-by-side render puts both inputs on a 60 fps grid before `hstack`.
+- **Re-timed takes have unusual frame rates.** A 30 fps clip at 0.75x becomes 40 fps. `-fps_mode passthrough` and `-enc_time_base:v filter` keep every frame, because resampling to 30 visibly stutters. The compare renders put both inputs on a 60 fps grid before `hstack`/`vstack`.
+- **Synthetic songs all share one eight-chord vocabulary,** so two different `make_reference` seeds score 5–7 against each other, well above `MIN_MATCH_SCORE`. A synthetic "wrong song" needs to be transposed out of those chords (see `test_ambiguity.py`); real songs don't have this problem.
 - **`peak_ratio` can be infinite** when nothing competes with the winner. The API sends it as `null`.
+- **With `DANCESYNC_PASSPHRASE` set, every `/api` call needs the session cookie.** `<video>`/`<audio>` send it on range requests because everything is same-origin; a cross-origin frontend would need credentialed CORS.
 - **The full pytest run takes about a minute,** because the sync tests render real video. librosa's "empty frequency set" warnings on synthetic audio are expected.
 
 ## Coding style
@@ -123,7 +132,7 @@ The owner of this repo reviews and debugs every line. Write code they can read i
 
 ## GitHub Actions
 
-Both workflows in `.github/workflows/` run `anthropics/claude-code-action@v1` with the `CLAUDE_CODE_OAUTH_TOKEN` secret. `claude.yml` responds to `@claude` in issue and PR comments, and `claude-code-review.yml` auto-reviews every PR through the `code-review@claude-code-plugins` plugin. No workflow runs the test suites yet; that's a Phase 5 item.
+`test.yml` runs `pytest` (with ffmpeg installed), Vitest, and a `web` build on every PR and on pushes to `main`. The other two workflows run `anthropics/claude-code-action@v1` with the `CLAUDE_CODE_OAUTH_TOKEN` secret. `claude.yml` responds to `@claude` in issue and PR comments, and `claude-code-review.yml` auto-reviews every PR through the `code-review@claude-code-plugins` plugin.
 
 ## Roadmap
 

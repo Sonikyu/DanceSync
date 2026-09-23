@@ -1,12 +1,21 @@
 import { useRef, useState } from "react";
+import { REVIEW_SPEEDS, playbackRates } from "../flow.js";
+import LayoutToggle from "./LayoutToggle.jsx";
 import PlayBar from "./PlayBar.jsx";
+import Segmented from "./Segmented.jsx";
 import SoundToggle from "./SoundToggle.jsx";
 import useLinkedPlayback from "./useLinkedPlayback.js";
 
-// The synced take beside the original choreography, both cut to the same
-// stretch of the song and driven by one play bar. Only the take makes sound;
-// the reference is always muted. When the song file is audio-only there's no
-// picture to show, so the reference stays hidden and the take plays alone.
+// The synced take with the original choreography beside it or above it
+// (`layout`), both cut to the same stretch of the song and driven by one play
+// bar. Only the take makes sound; the reference is always muted. When the
+// song file is audio-only there's no picture to show, so the reference stays
+// hidden, the take plays alone, and there's no layout to pick.
+//
+// Speed slows both down together for reviewing a fast passage. It starts at
+// 1× for every take and isn't saved.
+const SPEED_OPTIONS = REVIEW_SPEEDS.map((speed) => ({ value: speed, label: `${speed}×` }));
+
 export default function ComparePlayer({
   referenceUrl,
   takeUrl,
@@ -15,6 +24,8 @@ export default function ComparePlayer({
   roomAvailable,
   onSoundChange,
   onReferenceVideo,
+  layout,
+  onLayoutChange,
 }) {
   const takeRef = useRef(null);
   const referenceRef = useRef(null);
@@ -22,7 +33,10 @@ export default function ComparePlayer({
   const [durationSec, setDurationSec] = useState(0);
   const [takeAspect, setTakeAspect] = useState(null);
   const [referenceAspect, setReferenceAspect] = useState(null);   // null = no picture
-  const linked = useLinkedPlayback(takeRef, referenceRef, offsetSec);
+  const [speed, setSpeed] = useState(1);
+  // The take here is a render, so it's already at the song's tempo.
+  const rates = playbackRates({ rate: 1, speed });
+  const linked = useLinkedPlayback(takeRef, referenceRef, offsetSec, rates);
 
   function takeLoaded() {
     const take = takeRef.current;
@@ -52,10 +66,10 @@ export default function ComparePlayer({
     onSoundChange(nextSound);
   }
 
-  const showReference = referenceAspect !== null;
+  const hasReferenceVideo = referenceAspect !== null;
   return (
-    <div className={showReference ? "player wide" : "player"}>
-      <div className="compare">
+    <div className={`player ${layout}`}>
+      <div className={`compare ${layout}`}>
         <video
           ref={referenceRef}
           className="compare-video"
@@ -63,7 +77,7 @@ export default function ComparePlayer({
           muted
           playsInline
           preload="auto"
-          hidden={!showReference}
+          hidden={layout === "take"}
           style={{ "--aspect": referenceAspect }}
           onLoadedMetadata={referenceLoaded}
         />
@@ -86,7 +100,11 @@ export default function ComparePlayer({
         onToggle={linked.playing ? linked.pause : linked.play}
         onSeek={linked.seek}
       />
-      <SoundToggle sound={sound} roomAvailable={roomAvailable} onChange={changeSound} />
+      <div className="controls">
+        <SoundToggle sound={sound} roomAvailable={roomAvailable} onChange={changeSound} />
+        <Segmented label="Speed" options={SPEED_OPTIONS} value={speed} onChange={setSpeed} />
+        {hasReferenceVideo && <LayoutToggle layout={layout} onChange={onLayoutChange} />}
+      </div>
     </div>
   );
 }

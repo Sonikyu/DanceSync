@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from dancesync.config import AMBIGUOUS_PEAK_RATIO
+from dancesync.config import AMBIGUOUS_PEAK_RATIO, MIN_CLIP_SEC, MIN_MATCH_SCORE, SR
 from dancesync.types import Candidate as MatchCandidate
 from dancesync.types import MatchResult
 from server.routes import clips as clip_routes
@@ -109,13 +109,16 @@ def test_references_listed_newest_first(client):
 
 
 def test_reference_media_served_with_range_support(client):
-    ref_audio = make_reference(duration_sec=20.0, seed=11)
-    reference = upload_reference(client, ref_audio)
+    # libsndfile stamps the time into float WAV headers, so compare against
+    # these exact bytes rather than a second wav_bytes call.
+    uploaded = wav_bytes(make_reference(duration_sec=20.0, seed=11))
+    files = {"file": ("song.wav", uploaded, "audio/wav")}
+    reference = client.post("/api/references", files=files).json()
     url = f"/api/references/{reference['id']}/media"
 
     full = client.get(url)
     assert full.status_code == 200
-    assert full.content == wav_bytes(ref_audio)
+    assert full.content == uploaded
 
     # Byte ranges let the browser seek to a candidate's offset without
     # downloading the whole song first.
@@ -161,3 +164,70 @@ def test_unrivaled_peak_round_trips_as_null(client, monkeypatch):
     fetched = client.get(f"/api/clips/{body['id']}")
     assert fetched.status_code == 200
     assert fetched.json() == body
+
+
+def test_clip_shorter_than_minimum_is_rejected(client):
+    ref_audio = make_reference(duration_sec=60.0, seed=18)
+    reference = upload_reference(client, ref_audio)
+    clip = make_clip(ref_audio, start_sec=10.0, duration_sec=5.0, rate=1.0, snr_db=10.0)
+
+    files = {"file": ("practice.wav", wav_bytes(clip.audio), "audio/wav")}
+    resp = client.post("/api/clips", params={"reference_id": reference["id"]}, files=files)
+
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert detail["error"] == "clip_too_short"
+    assert detail["duration_sec"] == pytest.approx(5.0, abs=0.05)
+    assert detail["min_sec"] == MIN_CLIP_SEC
+
+
+def test_clip_just_over_minimum_aligns(client):
+    ref_audio = make_reference(duration_sec=60.0, seed=18)
+    reference = upload_reference(client, ref_audio)
+    clip = make_clip(ref_audio, start_sec=10.0, duration_sec=MIN_CLIP_SEC + 0.5, rate=1.0, snr_db=10.0)
+
+    body = upload_clip(client, reference["id"], clip.audio)
+
+    assert len(clip.audio) / SR > MIN_CLIP_SEC
+    assert body["alignment"]["top_candidates"][0]["offset_sec"] == pytest.approx(10.0, abs=0.5)
+    assert body["alignment"]["failed"] is False
+
+
+@pytest.mark.parametrize(
+    ("score", "failed"),
+    [(MIN_MATCH_SCORE - 0.01, True), (MIN_MATCH_SCORE + 0.01, False)],
+)
+def test_failed_flag_follows_winner_score(client, monkeypatch, score, failed):
+    weak_match = MatchResult(top_candidates=(MatchCandidate(rate=0.75, offset_sec=3.0, score=score, peak_ratio=1.5),))
+    monkeypatch.setattr(clip_routes, "align_clip", lambda *args: weak_match)
+    reference = upload_reference(client, make_reference(duration_sec=20.0, seed=19))
+
+    body = upload_clip(client, reference["id"], make_reference(duration_sec=5.0, seed=20))
+    assert body["alignment"]["failed"] is failed
+
+
+def test_clip_media_serves_the_upload_with_range_support(client):
+    ref_audio = make_reference(duration_sec=60.0, seed=22)
+    reference = upload_reference(client, ref_audio)
+    clip = make_clip(ref_audio, start_sec=10.0, duration_sec=15.0, rate=0.75, snr_db=10.0)
+    # One set of bytes, uploaded and compared: libsndfile stamps the time
+    # into float WAV headers, so a second wav_bytes call can differ.
+    uploaded = wav_bytes(clip.audio)
+    files = {"file": ("practice.wav", uploaded, "audio/wav")}
+    body = client.post("/api/clips", params={"reference_id": reference["id"]}, files=files).json()
+    url = f"/api/clips/{body['id']}/media"
+
+    full = client.get(url)
+    assert full.status_code == 200
+    assert full.content == uploaded
+    assert full.headers["content-type"] == "audio/x-wav"
+
+    # A <video> seeking into a long take asks for just the bytes it needs.
+    partial = client.get(url, headers={"Range": "bytes=1000-1999"})
+    assert partial.status_code == 206
+    assert partial.content == full.content[1000:2000]
+    assert partial.headers["content-range"] == f"bytes 1000-1999/{len(full.content)}"
+
+
+def test_clip_media_unknown_404s(client):
+    assert client.get("/api/clips/nope/media").status_code == 404

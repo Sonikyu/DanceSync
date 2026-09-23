@@ -1,3 +1,5 @@
+import { clipTooShortMessage } from "./flow.js";
+
 // Fetch wrappers for the FastAPI backend. Paths are relative: in dev, Vite
 // proxies /api to the server, so the browser only ever talks to one origin.
 
@@ -5,9 +7,29 @@ const UNREACHABLE = "Can't reach the DanceSync server. Is it running?";
 
 // The server's error text is written for developers; these are for dancers.
 const MESSAGES = {
+  401: "You've been signed out. Reload the page to sign in again.",
   413: "That file's too big. Songs can be up to 100 MB and videos up to 500 MB.",
   415: "That file type isn't supported. Use a video (.mp4, .mov) or audio file (.mp3, .m4a, .wav).",
 };
+
+// `{ signed_in }`. Always true when the server has no passphrase set.
+export function getSession() {
+  return request("/api/session");
+}
+
+// Resolves on success. The session cookie it sets covers every later
+// request, including the range requests <video> and <audio> make.
+export async function signIn(passphrase) {
+  const resp = await fetch("/api/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ passphrase }),
+  }).catch(() => {
+    throw new Error(UNREACHABLE);
+  });
+  if (resp.status === 401) throw new Error("That's not the passphrase. Try again.");
+  if (!resp.ok) throw new Error("Something went wrong on the server. Try again.");
+}
 
 export function listReferences() {
   return request("/api/references");
@@ -35,11 +57,20 @@ export function referenceMediaUrl(referenceId) {
   return `/api/references/${referenceId}/media`;
 }
 
-// `sound` is "song" or "room"; `layout` is "take" or "side-by-side". The
-// server renders whichever candidate is selected -- `candidate` in the query
-// only stops the browser replaying a cached render of a different one.
-export function syncedVideoUrl(clipId, candidateIndex, sound, layout) {
-  const query = new URLSearchParams({ candidate: candidateIndex, sound, layout });
+// Everything a render depends on besides the clip, which is in the URL's
+// path. Mirrors the server's RenderParams, and tests/test_render_params.py
+// fails if the two drift. Every field goes in the URL, so a render that
+// changes never replays from the browser's cache (invariant 7).
+export const RENDER_PARAM_FIELDS = ["reference_id", "rate", "offset_sec", "layout", "sound"];
+
+// `renderParams` comes from flow.renderParams. The server reads `sound` and
+// `layout` from the query and the alignment from its own catalog.
+export function syncedVideoUrl(clipId, renderParams) {
+  const query = new URLSearchParams();
+  for (const field of RENDER_PARAM_FIELDS) {
+    if (renderParams[field] === undefined) throw new Error(`syncedVideoUrl: missing ${field}`);
+    query.set(field, renderParams[field]);
+  }
   return `/api/clips/${clipId}/synced?${query}`;
 }
 
@@ -76,5 +107,21 @@ function upload(url, file, onProgress) {
 
 function parseResponse(status, text) {
   if (status < 400) return JSON.parse(text);
-  throw new Error(MESSAGES[status] ?? "Something went wrong on the server. Try again.");
+  throw new Error(errorMessage(status, text));
+}
+
+// Most errors get a fixed message by status. A too-short clip gets one with
+// its own numbers, from the server's structured `detail`.
+function errorMessage(status, text) {
+  const detail = errorDetail(text);
+  if (detail?.error === "clip_too_short") return clipTooShortMessage(detail.duration_sec, detail.min_sec);
+  return MESSAGES[status] ?? "Something went wrong on the server. Try again.";
+}
+
+function errorDetail(text) {
+  try {
+    return JSON.parse(text).detail;
+  } catch {
+    return null;
+  }
 }

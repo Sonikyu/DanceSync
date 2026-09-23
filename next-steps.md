@@ -15,7 +15,7 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 1. **Song:** pick a song used before, or upload a new one (an audio file, or a video of the choreography).
 2. **Video:** upload the practice video. The server aligns it, which takes 10–30 s.
 3. **Match:** this step appears only when the match is ambiguous (a repeated chorus, `peak_ratio` < 1.2). It shows the top 3 candidates on a song timeline and plays 8 s of the song at each one, and the user picks the right one.
-4. **Watch:** the synced take plays next to the reference video, with one play bar for both. The sound can be the song or the room (the phone's own recording). The user can download the take on its own or the side-by-side version.
+4. **Watch:** the synced take plays next to the reference video, with one play bar for both. The sound can be the song or the room (the phone's own recording). The user can slow the review to 0.5× or 0.75×, pick a layout (side by side, stacked, or take only), and download exactly what's on screen.
 
 ---
 
@@ -29,6 +29,8 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 | 4. Web UI | Done |
 | 5. Polish & deploy | Not started; the items marked **MVP** are what's left before the MVP is done |
 | Post-MVP features | Specced in [`specs/`](specs/) |
+
+Invariant 7 (render cache names) is enforced by one `RenderParams` record shared by the server's cache id and the browser's URL, with a test that fails if they drift (DS-03).
 
 pytest covers the Tier A matcher regression, the ambiguity threshold, the API routes, and real ffmpeg renders. Vitest covers the UI's pure helpers in `web/src/flow.js`.
 
@@ -55,8 +57,8 @@ Built as planned: FastAPI, local storage keyed by content hash, alignment done s
 
 Endpoints:
 - `POST /api/references`, `GET /api/references`, `GET /api/references/{id}/media`
-- `POST /api/clips`, `GET /api/clips/{id}`, `POST /api/clips/{id}/select`
-- `GET|HEAD /api/clips/{id}/synced?sound=song|room&layout=take|side-by-side`
+- `POST /api/clips`, `GET /api/clips/{id}`, `GET /api/clips/{id}/media` (the uploaded take, with range requests; for instant preview), `POST /api/clips/{id}/select`
+- `GET|HEAD /api/clips/{id}/synced?sound=song|room&layout=take|side-by-side|stacked`
 
 ### Phase 3 — Video sync engine (`dancesync/sync.py`, `dancesync/ffmpeg.py`)
 
@@ -64,7 +66,7 @@ Built as planned: one ffmpeg command per render, `setpts=PTS*rate`, and the refe
 
 - **Every captured frame is kept** (`-fps_mode passthrough`). A 30 fps take at 0.75x comes out at 40 fps instead of losing frames.
 - **Two sounds:** `song` (the reference track) or `room` (the phone's own recording, sped up with `atempo`).
-- **Two layouts:** `take` alone, or `side-by-side`, with the reference video on the left. Both videos are scaled to 720 px high and put on a 60 fps grid.
+- **Three layouts:** `take` alone, `side-by-side` (reference on the left, both 720 px high), or `stacked` (reference on top, both 720 px wide; added post-MVP). The last two are one `build_compare_command` on a 60 fps grid.
 - **Renders are cached** under a filename that encodes every input. Each one is written to a temp file and then renamed, so a failed render never looks finished.
 - **`HEAD` on `/synced` renders without sending a body.** The UI waits on it because iOS Safari doesn't fetch a `<video>` source until the user presses play.
 
@@ -85,21 +87,18 @@ Built with React 19, Vite, and plain CSS, and no other runtime dependencies. Vit
 
 Ticketed as three separate tracks — Ship (what's left before the MVP is done), Operate, and Platform. See [`tickets/README.md`](tickets/README.md).
 
-- **Tests in CI (MVP):** a GitHub Actions workflow that runs `pytest` and `npm --prefix web test` on every PR. Right now only the Claude workflows run.
+- **Tests in CI (MVP):** done. `.github/workflows/test.yml` runs `pytest` and `npm --prefix web test` on every PR.
 - **Error cases (MVP):** friendly messages already exist for files that are too big, unsupported file types, and an unreachable server. Still needed:
-  - clips too short to match
-  - no strong peak anywhere, meaning the alignment failed outright rather than being ambiguous. The UI should hand off to manual placement ([manual-alignment](specs/manual-alignment.md)) instead of stopping at an error.
-  - a startup check that stops the server if ffmpeg is missing
-- **One-command run (MVP):**
-  - a Dockerfile with ffmpeg and the Python dependencies
-  - FastAPI serving the built `web/dist`, so production stays on one origin like dev
-  - `docker compose up` to start the whole stack
-- **Access control:** a shared passphrase, or basic auth at the reverse proxy, before the server is reachable from the internet. This is required before YouTube import is exposed.
-- **Render cleanup:** renders in `.data/server/synced/` are never deleted. Cap their total size and delete the least recently used first.
+  - ~~clips too short to match~~ (done: `MIN_CLIP_SEC` = 10 s, measured; the upload answers 422 with the clip's length)
+  - ~~no strong peak anywhere~~ (done: `MIN_MATCH_SCORE` = 3.5, measured; `AlignmentResult.failed` and a "couldn't find this take" screen with a "watch anyway" escape). Handing off to manual placement ([manual-alignment](specs/manual-alignment.md)) is DS-26.
+  - ~~a startup check that stops the server if ffmpeg is missing~~ (done)
+- **One-command run (MVP):** done. A multi-stage `Dockerfile` (Node builds `web/dist`, Python 3.11 slim with ffmpeg runs it), FastAPI serving that build from the API's origin (`server/web.py`), and `docker compose up` with named volumes for data and cache. Settings come from `DANCESYNC_*` env vars (`.env.example`).
+- **Access control:** done. Set `DANCESYNC_PASSPHRASE` and every `/api` request needs the cookie from `POST /api/session`; the web app shows a sign-in screen. Unset means no sign-in, as before.
+- **Render cleanup:** done. Renders are capped at `DANCESYNC_RENDER_CACHE_GB` (5 GB by default); after each new render, the least recently served ones are deleted (`server/render_cache.py`) and re-rendered on demand.
 - **Background jobs and progress:** move alignment and rendering to a job queue that reports progress over server-sent events (SSE). Needed for:
   - [follow-dancer](specs/follow-dancer.md), where tracking takes minutes
   - any reverse proxy with a 60 s timeout in front of a long render
-- **Hosting:** a single small VPS, or a home machine reached over a private network. If YouTube import matters, test it from the chosen host, because YouTube often blocks datacenter IPs.
+- **Hosting:** runbook in [`docs/hosting.md`](docs/hosting.md): a small VPS with Docker and Caddy (600 s proxy timeouts, from measured render times), or a home machine over Tailscale. The YouTube-from-this-host test waits until YouTube import exists.
 - **Benchmark harness:** real-world clips with known correct offsets, run in CI to catch matcher regressions.
 - **Deferred: cloud storage (S3/GCS).** A self-hosted deployment for the owner and friends doesn't need it. `server/storage.py` stays separate so it can be swapped in later.
 
@@ -112,9 +111,9 @@ These come from `TODO.md`, and each one has its own spec. Recommended order:
 | # | Feature | Spec | Size | Depends on |
 |---|---|---|---|---|
 | 1 | Instant preview (watch before rendering) | [instant-preview.md](specs/instant-preview.md) | M | — |
-| 2 | Review speed on Watch (0.5× / 0.75× / 1×) | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
+| 2 | Review speed on Watch (0.5× / 0.75× / 1×) — **done** (on the rendered take; instant preview passes the matched rate to `playbackRates`) | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
 | 3 | Manual alignment + speed tuning | [manual-alignment.md](specs/manual-alignment.md) | S–M | 1 |
-| 4 | Layouts: side by side, stacked, take only | [layouts.md](specs/layouts.md) | S | 1 (easier after) |
+| 4 | Layouts: side by side, stacked, take only — **done** | [layouts.md](specs/layouts.md) | S | 1 (easier after) |
 | 5 | YouTube import | [youtube-import.md](specs/youtube-import.md) | S–M | access control before exposing it on the internet |
 | 6 | Basic editing: crop, mirror, rotate, trim | [video-editing.md](specs/video-editing.md) | M | 1 |
 | 7 | Takes at any practice speed | [practice-speeds.md](specs/practice-speeds.md) | M | — |

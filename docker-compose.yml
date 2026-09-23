@@ -1,0 +1,22 @@
+# The whole stack: one container running the API and serving the web app.
+#   cp .env.example .env    # optional: change the port or limits
+#   docker compose up -d --build
+services:
+  dancesync:
+    build: .
+    image: dancesync
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 8000
+    ports:
+      - "${DANCESYNC_PORT:-8000}:8000"
+    volumes:
+      - data:/data
+      - cache:/cache
+
+volumes:
+  data:     # uploads, the catalog, and rendered videos
+  cache:    # decoded audio and stretched features; safe to delete

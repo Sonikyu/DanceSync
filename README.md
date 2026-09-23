@@ -4,7 +4,7 @@ Practice to slowed-down music, then review at full speed.
 
 A dancer plays a song at reduced speed (say 0.75×) on a laptop and films themselves on a phone. DanceSync works out which part of the song the recording covers and how fast it was playing. It then re-times the video to the original tempo and puts the original track under it, next to the choreography video if there is one.
 
-> **For now, DanceSync runs on your own computer.** Hosting it as a web app is planned; see Phase 5 in [next-steps.md](next-steps.md).
+> **Two ways to run it:** from source on your own computer (below), or as a single Docker container that you can also host on a server ([Running it with Docker](#running-it-with-docker)).
 
 ## How it works
 
@@ -84,7 +84,7 @@ Leave both terminals open while you use the app. Errors from the server show up 
 
 ### 4. Try it
 
-1. **Choose your song:** upload the original track. An audio file works; a video of the choreography is better, because then you get the side-by-side view.
+1. **Choose your song:** upload the original track. An audio file works; a video of the choreography is better, because then you can watch your take beside it or under it.
 2. **Add your practice video:** the phone recording. Finding your place in the song takes 10–30 seconds, and the first take against a new song takes longer.
 3. **Which part did you dance?** You only see this screen if the song has repeated sections that sound alike. Play each candidate and pick yours.
 4. **Watch:** the synced take plays next to the reference. Switch between the song and the room sound, or download the video.
@@ -94,6 +94,26 @@ Songs you've uploaded stay in the list the next time you start the app.
 ### Stopping
 
 Press **Ctrl+C** in each terminal.
+
+---
+
+## Running it with Docker
+
+On any machine that has [Docker](https://docs.docker.com/get-docker/), this is all it takes. The Docker image includes ffmpeg and the built web app, so you don't need to install Python or Node:
+
+```bash
+git clone https://github.com/Sonikyu/DanceSync.git && cd DanceSync
+cp .env.example .env              # optional: change the port or upload limits
+docker compose up -d --build
+```
+
+Open http://localhost:8000. A single container serves both the web app and the API on one port.
+
+- **Your files live in two Docker volumes.** `data` holds uploads, their metadata, and renders. `cache` holds decoded audio and song features, and it's safe to delete. Both survive `docker compose down` and rebuilds. Only `docker compose down -v` deletes them.
+- **Updating:** `git pull && docker compose up -d --build`.
+- **Logs:** `docker compose logs -f`.
+- **Hosting it on a server** for friends: follow [docs/hosting.md](docs/hosting.md).
+- **Before you put it on the internet,** set `DANCESYNC_PASSPHRASE` in `.env` and run `docker compose up -d` again. Everyone then signs in once with that passphrase, and stays signed in for 30 days on that browser.
 
 ---
 
@@ -108,7 +128,7 @@ npm --prefix web run dev -- --host
 Vite then prints a `Network:` address such as `http://192.168.1.23:5173/`. Open it on a phone that's on the same Wi-Fi. The API server doesn't need any changes, because the web app forwards to it.
 
 - Use the numeric address Vite prints. Vite rejects hostnames like `my-mac.local` with "Blocked request. This host is not allowed."
-- Only do this on a network you trust. Anyone on it can open the app, and it has no password yet.
+- Only do this on a network you trust. Anyone on it can open the app, unless you start the API with a passphrase: `DANCESYNC_PASSPHRASE=… .venv/bin/uvicorn server.main:app --port 8000`.
 
 ---
 
@@ -125,7 +145,7 @@ npm --prefix web install               # if web/package.json changed
 
 | Folder | Holds |
 |---|---|
-| `.data/server/` | uploaded songs and videos, their metadata, and rendered videos |
+| `.data/server/` | uploaded songs and videos, their metadata, and rendered videos (capped at 5 GB; the least recently watched are deleted and re-rendered on demand) |
 | `.cache/dancesync/` | decoded audio and pre-computed song features, which make later takes faster |
 
 Both folders are gitignored. **To start fresh**, stop the servers and delete them. This deletes everything you've uploaded:
@@ -151,6 +171,7 @@ DANCESYNC_API_URL=http://localhost:8001 npm --prefix web run dev
 |---|---|
 | "Can't reach the DanceSync server. Is it running?" | Terminal 1 isn't running, or it crashed. Check it and start it again. |
 | "Something went wrong on the server." | Check terminal 1 for a traceback. If it ends in `needs ffmpeg to decode`, run `brew install ffmpeg` and restart the API. |
+| "We couldn't find this take in the song" | The sound in the video didn't match the song well enough anywhere. Usually it's the wrong song, a practice speed other than full, ¾ or ½, or music too quiet under the room noise. "Watch the best guess anyway" shows what the matcher found. |
 | "Couldn't make that video." | The render failed, and terminal 1 only logs a `422` line. To see ffmpeg's actual error, open your browser's developer tools, go to the Network tab, find the failed `synced?…` request, and open its URL in a new tab. The usual causes are a missing ffmpeg or a corrupt file. |
 | `[Errno 48] Address already in use` | Something else is on port 8000, often an API server you left running. Find it with `lsof -i :8000`, or use another port (see above). |
 | `ModuleNotFoundError` when starting the API | Run the `pip install` line from step 2 again. Make sure the command starts with `.venv/bin/`. |
