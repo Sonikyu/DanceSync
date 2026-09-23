@@ -24,7 +24,7 @@ DanceSync/
 │   └── ffmpeg.py             # how to run ffmpeg: presence check, probe, encoder args, atomic writes
 ├── server/                   # FastAPI app
 │   ├── main.py               # app, CORS, routers
-│   ├── routes/               # session (sign-in), references, clips, align (candidate select), synced
+│   ├── routes/               # session (sign-in), references, clips, align (candidate select, manual alignment), synced
 │   ├── models.py             # Pydantic request/response bodies + persisted records
 │   ├── storage.py            # raw bytes on disk, keyed by content hash
 │   ├── catalog.py            # JSON metadata records (kept separate from storage)
@@ -75,8 +75,8 @@ docker compose up -d --build                          # production-style: one co
   3. `matcher.precompute_ref_features` builds the stretched reference features, cached per reference id.
   4. `matcher.match` produces the `AlignmentResult`: the top 3 candidates plus the `ambiguous` flag (`peak_ratio` < `AMBIGUOUS_PEAK_RATIO`) and the `failed` flag (winning score < `MIN_MATCH_SCORE`). It's saved in the catalog. Clips under `MIN_CLIP_SEC` are rejected with 422 before matching.
 - **Render** (runs on `HEAD`/`GET /api/clips/{id}/synced`):
-  1. `routes/synced.py` picks the chosen candidate, or the best one if the user never picked.
-  2. The route builds a `RenderParams` from the clip's chosen candidate plus `sound`/`layout`, and `worker.sync_clip` calls `sync.render_synced` (layout `take`) or `sync.render_compare` (`side-by-side`, `stacked`) with it.
+  1. `routes/synced.py` takes the clip's effective alignment (`models.effective_alignment`): the manual alignment if the dancer set one on Watch, else the chosen candidate, else the best one. `flow.effectiveAlignment` is the browser's copy of that rule.
+  2. The route builds a `RenderParams` from that alignment plus `sound`/`layout`, and `worker.sync_clip` calls `sync.render_synced` (layout `take`) or `sync.render_compare` (`side-by-side`, `stacked`) with it.
   3. `ffmpeg.run_to_file` writes the output. Its filename encodes every input, so an existing file is served as-is.
   4. `render_cache.touch` marks it used; after a new render, `render_cache.sweep` deletes the least recently used renders past `RENDER_CACHE_MAX_BYTES`.
 - **Watch** (in the browser): `ComparePlayer` plays the rendered take and the reference media on one play bar. `useLinkedPlayback` treats the take as the clock and nudges the muted reference's `playbackRate` to keep up. Review speed (0.5×/0.75×/1×) sets both base rates through `flow.playbackRates`, and the nudge is around that base; downloads are unaffected. The layout (side by side, stacked, take only; `flow.layoutFor`) is a class on `.compare`, and the one Download button renders that layout and sound.

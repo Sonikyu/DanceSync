@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { referenceMediaUrl, renderSynced, syncedVideoUrl } from "../api.js";
-import { chosenCandidate, formatRate, formatTime, layoutFor, renderParams } from "../flow.js";
+import { effectiveAlignment, formatRate, formatTime, layoutFor, renderParams } from "../flow.js";
 import ComparePlayer from "./ComparePlayer.jsx";
 import DownloadButton from "./DownloadButton.jsx";
 import useWideViewport from "./useWideViewport.js";
@@ -15,7 +15,7 @@ export default function WatchStep({ song, clip, onChangeMatch, onNewTake, layout
   const [error, setError] = useState(null);
   const wideViewport = useWideViewport();
   const layout = layoutFor({ picked: layoutPick, wideViewport, hasReferenceVideo });
-  const candidate = chosenCandidate(clip);
+  const alignment = effectiveAlignment(clip);
   const videoUrl = (sound, layout) => syncedVideoUrl(clip.id, renderParams(clip, sound, layout));
   const songTakeUrl = videoUrl("song", "take");
   const roomTakeUrl = videoUrl("room", "take");
@@ -45,7 +45,7 @@ export default function WatchStep({ song, clip, onChangeMatch, onNewTake, layout
         <ComparePlayer
           referenceUrl={referenceMediaUrl(song.id)}
           takeUrl={videoUrl(sound, "take")}
-          offsetSec={candidate.offset_sec}
+          offsetSec={alignment.offset_sec}
           sound={sound}
           roomAvailable={roomAvailable}
           onSoundChange={setSound}
@@ -56,7 +56,7 @@ export default function WatchStep({ song, clip, onChangeMatch, onNewTake, layout
       )}
       {error && <p className="error">{error}</p>}
       <p className="caption">
-        Matched at {formatTime(candidate.offset_sec)} · {formatRate(candidate.rate)} ·{" "}
+        Matched at {formatTime(alignment.offset_sec)} · {formatRate(alignment.rate)} ·{" "}
         <button className="link" onClick={onChangeMatch}>Change match</button>
       </p>
       {status === "ready" && (

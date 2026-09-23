@@ -52,6 +52,21 @@ export function selectCandidate(clipId, index) {
   });
 }
 
+// Override the matcher's alignment with one set by hand. `offset_sec` is in
+// the original song timeline, like a candidate's. Resolves to the Clip.
+export function setManualAlignment(clipId, { rate, offset_sec }) {
+  return request(`/api/clips/${clipId}/manual`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rate, offset_sec }),
+  });
+}
+
+// Back to the matcher's alignment. Resolves to the Clip.
+export function clearManualAlignment(clipId) {
+  return request(`/api/clips/${clipId}/manual`, { method: "DELETE" });
+}
+
 // The song file itself: audio for previews, video for the side-by-side view.
 export function referenceMediaUrl(referenceId) {
   return `/api/references/${referenceId}/media`;

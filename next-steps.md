@@ -57,7 +57,7 @@ Built as planned: FastAPI, local storage keyed by content hash, alignment done s
 
 Endpoints:
 - `POST /api/references`, `GET /api/references`, `GET /api/references/{id}/media`
-- `POST /api/clips`, `GET /api/clips/{id}`, `GET /api/clips/{id}/media` (the uploaded take, with range requests; for instant preview), `POST /api/clips/{id}/select`
+- `POST /api/clips`, `GET /api/clips/{id}`, `GET /api/clips/{id}/media` (the uploaded take, with range requests; for instant preview), `POST /api/clips/{id}/select`, `PUT|DELETE /api/clips/{id}/manual` (an alignment set by hand; post-MVP)
 - `GET|HEAD /api/clips/{id}/synced?sound=song|room&layout=take|side-by-side|stacked`
 
 ### Phase 3 — Video sync engine (`dancesync/sync.py`, `dancesync/ffmpeg.py`)
