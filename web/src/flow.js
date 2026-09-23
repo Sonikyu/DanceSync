@@ -114,19 +114,32 @@ export function layoutFor({ picked, wideViewport, hasReferenceVideo }) {
 export const REVIEW_SPEEDS = [0.5, 0.75, 1];
 
 // `playbackRate`s for reviewing at `speed`. The song always plays at `speed`.
-// `rate` is the take media's own speed relative to the song: 1 for a
-// rendered take, which is already at full tempo, or the matched rate for the
+// `rate` is the take media's own speed relative to the song (takeRateFor):
+// 1 for a render at the alignment being played, or the matched rate for the
 // raw clip, which then plays at speed / rate -- exactly 1.0, as filmed, when
 // the dancer reviews at the speed they practised.
 export function playbackRates({ rate, speed }) {
   return { take: speed / rate, reference: speed };
 }
 
-// The element making the sound is the clock and the muted one follows it:
-// nudging a muted video's speed is invisible, nudging audio warbles. The
-// song plays from the reference element, the room from the take.
-export function leaderFor(sound) {
-  return sound === "room" ? "take" : "reference";
+// The take media's own speed relative to the song -- the `rate` for the
+// timing helpers above -- when a render made at `renderedRate` plays an
+// alignment at `rate`. A render already runs at full tempo, so re-timing it
+// live to a tuned rate is the ratio of the two: 1 when nothing was tuned.
+export function takeRateFor(rate, renderedRate) {
+  return rate / renderedRate;
+}
+
+// Which element is the clock at output time `outputSec`: the one making the
+// sound, since nudging a muted video's speed is invisible and nudging audio
+// warbles. The song plays from the reference element, the room from the
+// take, and "both" leads from the take so the song is the one nudged. Before
+// the song starts (a negative offset) and after it ends, there's no song to
+// lead with, so the take leads.
+export function leaderAt({ sound, outputSec, offsetSec, songDurationSec }) {
+  if (sound !== "song") return "take";
+  const songSec = referenceTimeFor(outputSec, offsetSec);
+  return songSec !== null && songSec < songDurationSec ? "reference" : "take";
 }
 
 // Where an offset sits along the song, as a CSS percentage clamped to the bar.

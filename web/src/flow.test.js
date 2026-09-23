@@ -8,12 +8,13 @@ import {
   formatRate,
   formatTime,
   layoutFor,
-  leaderFor,
+  leaderAt,
   nextOption,
   playbackRates,
   outputTimeFor,
   referenceTimeFor,
   renderParams,
+  takeRateFor,
   songTitle,
   stageOf,
   stepAfterAlignment,
@@ -160,8 +161,26 @@ describe("clip and output time", () => {
   });
 
   test("the element making the sound leads", () => {
-    expect(leaderFor("song")).toBe("reference");
-    expect(leaderFor("room")).toBe("take");
+    const at = (sound, outputSec) => leaderAt({ sound, outputSec, offsetSec: 30, songDurationSec: 200 });
+    expect(at("song", 10)).toBe("reference");
+    expect(at("room", 10)).toBe("take");
+    expect(at("both", 10)).toBe("take");
+  });
+
+  test("with no song playing yet or any more, the take leads", () => {
+    const at = (outputSec) => leaderAt({ sound: "song", outputSec, offsetSec: -2, songDurationSec: 100 });
+    expect(at(1.5)).toBe("take");        // the phone started recording 2 s early
+    expect(at(2)).toBe("reference");
+    expect(at(101.9)).toBe("reference");
+    expect(at(102)).toBe("take");        // the take outlasts the song
+  });
+
+  test("a render re-timed to a tuned rate runs at their ratio", () => {
+    expect(takeRateFor(0.75, 0.75)).toBe(1);
+    expect(takeRateFor(0.8, 0.75)).toBeCloseTo(16 / 15, 12);
+    // A 0.75 render tuned to 0.8: render second 3 is clip second 4, which is
+    // output second 3.2 at the tuned rate.
+    expect(outputTimeFor(3, takeRateFor(0.8, 0.75))).toBeCloseTo(3.2, 12);
   });
 });
 
