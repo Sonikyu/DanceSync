@@ -65,6 +65,27 @@ export function referenceTimeFor(takeSec, offsetSec) {
   return referenceSec < 0 ? null : referenceSec;
 }
 
+// Playing the raw take in the browser uses the timing dancesync/sync.py
+// renders with (see its module docstring, invariant 6). Output time T is what
+// the play bar shows, 0 to the take's length × rate. At T the raw take is at
+// clip time T / rate, playing at 1 / rate (a 0.75× take plays at 1.333×),
+// and the song is at offsetSec + T (referenceTimeFor), playing at 1. These
+// two are the browser's only conversions between clip and output time.
+export function clipTimeFor(outputSec, rate) {
+  return outputSec / rate;
+}
+
+export function outputTimeFor(clipSec, rate) {
+  return clipSec * rate;
+}
+
+// The element making the sound is the clock and the muted one follows it:
+// nudging a muted video's speed is invisible, nudging audio warbles. The
+// song plays from the reference element, the room from the take.
+export function leaderFor(sound) {
+  return sound === "room" ? "take" : "reference";
+}
+
 // Where an offset sits along the song, as a CSS percentage clamped to the bar.
 export function timelinePercent(offsetSec, durationSec) {
   return Math.min(Math.max(offsetSec / durationSec, 0), 1) * 100;

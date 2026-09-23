@@ -1,9 +1,12 @@
 import { describe, expect, test } from "vitest";
 import {
   chosenCandidate,
+  clipTimeFor,
   clipTooShortMessage,
   formatRate,
   formatTime,
+  leaderFor,
+  outputTimeFor,
   referenceTimeFor,
   renderParams,
   songTitle,
@@ -112,5 +115,47 @@ describe("render params", () => {
       layout: "side-by-side",
       sound: "room",
     });
+  });
+});
+
+describe("clip and output time", () => {
+  const TIMES = [0, 0.1, 1 / 3, 7.2, 12.25, 59.9, 3600];
+
+  test("a 0.75× take plays at 1.333×: 3 s of output shows clip second 4", () => {
+    expect(clipTimeFor(3, 0.75)).toBe(4);
+    expect(outputTimeFor(4, 0.75)).toBe(3);
+    expect(clipTimeFor(3, 0.5)).toBe(6);
+    expect(clipTimeFor(3, 1)).toBe(3);
+  });
+
+  test("round trips are exact at 1× and 0.5×", () => {
+    for (const rate of [1, 0.5]) {
+      for (const sec of TIMES) {
+        expect(outputTimeFor(clipTimeFor(sec, rate), rate)).toBe(sec);
+        expect(clipTimeFor(outputTimeFor(sec, rate), rate)).toBe(sec);
+      }
+    }
+  });
+
+  // Dividing by 0.75 can't be exact in binary floating point: some values
+  // come back one unit in the last place off. A picosecond is not a frame.
+  test("round trips at 0.75× agree to a picosecond", () => {
+    for (const sec of TIMES) {
+      expect(Math.abs(outputTimeFor(clipTimeFor(sec, 0.75), 0.75) - sec)).toBeLessThan(1e-12);
+      expect(Math.abs(clipTimeFor(outputTimeFor(sec, 0.75), 0.75) - sec)).toBeLessThan(1e-12);
+    }
+  });
+
+  test("with a negative offset, the song starts partway into the take", () => {
+    // The phone started recording 2 s (of song time) before the song. The
+    // song starts at output 2 s, which is clip second 2.667 of a 0.75× take.
+    expect(referenceTimeFor(1, -2)).toBeNull();
+    expect(referenceTimeFor(2, -2)).toBe(0);
+    expect(clipTimeFor(2, 0.75)).toBeCloseTo(8 / 3, 12);
+  });
+
+  test("the element making the sound leads", () => {
+    expect(leaderFor("song")).toBe("reference");
+    expect(leaderFor("room")).toBe("take");
   });
 });

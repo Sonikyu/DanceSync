@@ -109,13 +109,16 @@ def test_references_listed_newest_first(client):
 
 
 def test_reference_media_served_with_range_support(client):
-    ref_audio = make_reference(duration_sec=20.0, seed=11)
-    reference = upload_reference(client, ref_audio)
+    # libsndfile stamps the time into float WAV headers, so compare against
+    # these exact bytes rather than a second wav_bytes call.
+    uploaded = wav_bytes(make_reference(duration_sec=20.0, seed=11))
+    files = {"file": ("song.wav", uploaded, "audio/wav")}
+    reference = client.post("/api/references", files=files).json()
     url = f"/api/references/{reference['id']}/media"
 
     full = client.get(url)
     assert full.status_code == 200
-    assert full.content == wav_bytes(ref_audio)
+    assert full.content == uploaded
 
     # Byte ranges let the browser seek to a candidate's offset without
     # downloading the whole song first.
@@ -201,3 +204,30 @@ def test_failed_flag_follows_winner_score(client, monkeypatch, score, failed):
 
     body = upload_clip(client, reference["id"], make_reference(duration_sec=5.0, seed=20))
     assert body["alignment"]["failed"] is failed
+
+
+def test_clip_media_serves_the_upload_with_range_support(client):
+    ref_audio = make_reference(duration_sec=60.0, seed=22)
+    reference = upload_reference(client, ref_audio)
+    clip = make_clip(ref_audio, start_sec=10.0, duration_sec=15.0, rate=0.75, snr_db=10.0)
+    # One set of bytes, uploaded and compared: libsndfile stamps the time
+    # into float WAV headers, so a second wav_bytes call can differ.
+    uploaded = wav_bytes(clip.audio)
+    files = {"file": ("practice.wav", uploaded, "audio/wav")}
+    body = client.post("/api/clips", params={"reference_id": reference["id"]}, files=files).json()
+    url = f"/api/clips/{body['id']}/media"
+
+    full = client.get(url)
+    assert full.status_code == 200
+    assert full.content == uploaded
+    assert full.headers["content-type"] == "audio/x-wav"
+
+    # A <video> seeking into a long take asks for just the bytes it needs.
+    partial = client.get(url, headers={"Range": "bytes=1000-1999"})
+    assert partial.status_code == 206
+    assert partial.content == full.content[1000:2000]
+    assert partial.headers["content-range"] == f"bytes 1000-1999/{len(full.content)}"
+
+
+def test_clip_media_unknown_404s(client):
+    assert client.get("/api/clips/nope/media").status_code == 404

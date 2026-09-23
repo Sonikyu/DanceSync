@@ -1,4 +1,5 @@
-"""POST /api/clips (upload + auto-align) and GET /api/clips/{id}."""
+"""POST /api/clips (upload + auto-align), GET /api/clips/{id}, and
+GET /api/clips/{id}/media (the uploaded take itself)."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ from math import isinf
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
 from dancesync.audio import is_supported
 from dancesync.config import AMBIGUOUS_PEAK_RATIO, MIN_CLIP_SEC, MIN_MATCH_SCORE
@@ -68,6 +70,21 @@ async def get_clip(clip_id: str, catalog: Catalog = Depends(get_catalog)) -> Cli
     if clip is None:
         raise HTTPException(404, f"no clip with id {clip_id}")
     return clip
+
+
+@router.get("/{clip_id}/media", response_class=FileResponse)
+async def clip_media(
+    clip_id: str,
+    storage: LocalStorage = Depends(get_storage),
+    catalog: Catalog = Depends(get_catalog),
+) -> FileResponse:
+    """The uploaded take, byte for byte, so the browser can play it sped up
+    instead of waiting for a render. FileResponse answers byte-range
+    requests, so a 500 MB take can be seeked without downloading it whole."""
+    clip = catalog.get_clip(clip_id)
+    if clip is None:
+        raise HTTPException(404, f"no clip with id {clip_id}")
+    return FileResponse(storage.path_for("clips", clip.id, Path(clip.filename).suffix.lower()))
 
 
 def _too_short_detail(duration_sec: float) -> dict:
