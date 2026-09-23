@@ -53,10 +53,11 @@ def test_synced_video_lines_up_with_reference(client, tmp_path):
         10.0, abs=0.1
     )
 
+    # Served from cache: a re-render would rename a new file into place.
     rendered = list((tmp_path / "media" / "synced").glob("*.mp4"))
-    mtime_ns = rendered[0].stat().st_mtime_ns
+    inode = rendered[0].stat().st_ino
     client.get(f"/api/clips/{upload.json()['id']}/synced")
-    assert [p.stat().st_mtime_ns for p in rendered] == [mtime_ns]   # served from cache
+    assert [p.stat().st_ino for p in rendered] == [inode]
 
 
 def test_synced_uses_selected_candidate(client, monkeypatch):

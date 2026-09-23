@@ -92,7 +92,7 @@ Ticketed as three separate tracks — Ship (what's left before the MVP is done),
   - ~~a startup check that stops the server if ffmpeg is missing~~ (done)
 - **One-command run (MVP):** done. A multi-stage `Dockerfile` (Node builds `web/dist`, Python 3.11 slim with ffmpeg runs it), FastAPI serving that build from the API's origin (`server/web.py`), and `docker compose up` with named volumes for data and cache. Settings come from `DANCESYNC_*` env vars (`.env.example`).
 - **Access control:** done. Set `DANCESYNC_PASSPHRASE` and every `/api` request needs the cookie from `POST /api/session`; the web app shows a sign-in screen. Unset means no sign-in, as before.
-- **Render cleanup:** renders in `.data/server/synced/` are never deleted. Cap their total size and delete the least recently used first.
+- **Render cleanup:** done. Renders are capped at `DANCESYNC_RENDER_CACHE_GB` (5 GB by default); after each new render, the least recently served ones are deleted (`server/render_cache.py`) and re-rendered on demand.
 - **Background jobs and progress:** move alignment and rendering to a job queue that reports progress over server-sent events (SSE). Needed for:
   - [follow-dancer](specs/follow-dancer.md), where tracking takes minutes
   - any reverse proxy with a 60 s timeout in front of a long render

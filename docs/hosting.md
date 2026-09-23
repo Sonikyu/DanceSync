@@ -120,7 +120,7 @@ docker run --rm -v dancesync_data:/data -v "$PWD":/backup alpine \
 docker compose up -d
 ```
 
-**Renders are never deleted yet** (that's DS-10). Check the disk now and then with `docker system df -v | grep dancesync`. You can safely empty the renders at any time:
+**Renders are capped at 5 GB** by default: after each new render, the least recently watched ones are deleted, and they're re-rendered if someone asks for them again. Change the cap with `DANCESYNC_RENDER_CACHE_GB` in `.env`. Uploads are never deleted, so check the disk now and then with `docker system df -v | grep dancesync`. You can also empty the renders by hand at any time:
 
 ```bash
 docker compose exec dancesync sh -c 'rm -f /data/media/synced/*'

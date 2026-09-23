@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 
 from dancesync.ffmpeg import SyncError
 from dancesync.sync import Sound
+from server import config, render_cache
 from server.catalog import Catalog
 from server.deps import get_catalog, get_storage
 from server.models import Candidate, Clip, Layout
@@ -48,12 +49,16 @@ def download_synced(
     out_path = storage.path_for("synced", _synced_id(clip, candidate, sound, layout), ".mp4")
 
     try:
-        sync_clip(
+        rendered = sync_clip(
             clip_path, reference_path, candidate.rate, candidate.offset_sec, out_path,
             sound=sound, layout=layout,
         )
     except SyncError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+    render_cache.touch(out_path)
+    if rendered:
+        render_cache.sweep(out_path.parent, config.RENDER_CACHE_MAX_BYTES, keep=out_path)
 
     return FileResponse(out_path, media_type="video/mp4", filename=_download_name(clip, sound, layout))
 

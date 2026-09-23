@@ -42,13 +42,14 @@ def sync_clip(
     out_path: Path,
     sound: Sound,
     layout: Layout,
-) -> None:
-    """Render the synced video unless an earlier request already did. The
-    caller names `out_path` after everything the render depends on, so an
-    existing file is never stale."""
+) -> bool:
+    """Render the synced video unless an earlier request already did, and
+    say whether it rendered. The caller names `out_path` after everything
+    the render depends on, so an existing file is never stale."""
     if out_path.exists():
-        return
+        return False
     if layout == "side-by-side":
         sync.render_side_by_side(clip_path, reference_path, rate, offset_sec, out_path, sound)
     else:
         sync.render_synced(clip_path, reference_path, rate, offset_sec, out_path, sound)
+    return True

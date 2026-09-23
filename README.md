@@ -145,7 +145,7 @@ npm --prefix web install               # if web/package.json changed
 
 | Folder | Holds |
 |---|---|
-| `.data/server/` | uploaded songs and videos, their metadata, and rendered videos |
+| `.data/server/` | uploaded songs and videos, their metadata, and rendered videos (capped at 5 GB; the least recently watched are deleted and re-rendered on demand) |
 | `.cache/dancesync/` | decoded audio and pre-computed song features, which make later takes faster |
 
 Both folders are gitignored. **To start fresh**, stop the servers and delete them. This deletes everything you've uploaded:

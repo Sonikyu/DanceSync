@@ -18,6 +18,10 @@ ALLOWED_ORIGINS = os.environ.get(
     "DANCESYNC_CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
 ).split(",")
 
+# Rendered videos are deleted least recently used first once they total more
+# than this. Each one is a cache: deleting it only costs a re-render.
+RENDER_CACHE_MAX_BYTES = int(float(os.environ.get("DANCESYNC_RENDER_CACHE_GB", 5)) * 1024**3)
+
 # The output of `npm --prefix web run build`. Served at / when it exists.
 WEB_DIST = Path(os.environ.get("DANCESYNC_WEB_DIST", ROOT / "web" / "dist"))
 

@@ -29,6 +29,7 @@ DanceSync/
 │   ├── storage.py            # raw bytes on disk, keyed by content hash
 │   ├── catalog.py            # JSON metadata records (kept separate from storage)
 │   ├── worker.py             # align_clip / sync_clip (synchronous for now)
+│   ├── render_cache.py       # LRU cap on rendered videos (mtime = last served); swept after each new render
 │   ├── auth.py               # shared-passphrase sign-in: session cookie + middleware (off when unset)
 │   ├── web.py                # serves the built web/dist at / (when it exists), behind /api
 │   └── config.py             # storage root, upload limits, CORS origins, web dist (DANCESYNC_* env overrides)
@@ -77,6 +78,7 @@ docker compose up -d --build                          # production-style: one co
   1. `routes/synced.py` picks the chosen candidate, or the best one if the user never picked.
   2. `worker.sync_clip` calls `sync.render_synced` or `sync.render_side_by_side`.
   3. `ffmpeg.run_to_file` writes the output. Its filename encodes every input, so an existing file is served as-is.
+  4. `render_cache.touch` marks it used; after a new render, `render_cache.sweep` deletes the least recently used renders past `RENDER_CACHE_MAX_BYTES`.
 - **Watch** (in the browser): `ComparePlayer` plays the rendered take and the reference media on one play bar. `useLinkedPlayback` treats the take as the clock and nudges the muted reference's `playbackRate` to keep up.
 
 `dancesync/` never imports from `server/`, and `server/` reaches the matcher and renderer only through `worker.py`.
