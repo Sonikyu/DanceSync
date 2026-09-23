@@ -147,7 +147,8 @@ button:focus-visible, a:focus-visible, .dropzone:focus-within { outline: 2px sol
 .scrubber { flex: 1; min-width: 0; accent-color: var(--accent); }
 .playbar-time { color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-.sound { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 24px; }
+.control { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--border); }
 .segmented button { height: 30px; padding: 0 16px; border: 0; border-radius: 7px; background: none; color: var(--text-muted); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
 .segmented button[aria-checked="true"] { background: var(--surface); color: var(--text); }

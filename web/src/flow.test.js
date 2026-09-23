@@ -6,6 +6,8 @@ import {
   formatRate,
   formatTime,
   leaderFor,
+  nextOption,
+  playbackRates,
   outputTimeFor,
   referenceTimeFor,
   renderParams,
@@ -157,5 +159,42 @@ describe("clip and output time", () => {
   test("the element making the sound leads", () => {
     expect(leaderFor("song")).toBe("reference");
     expect(leaderFor("room")).toBe("take");
+  });
+});
+
+describe("review speed", () => {
+  test("a rendered take and the song both play at the review speed", () => {
+    expect(playbackRates({ rate: 1, speed: 0.5 })).toEqual({ take: 0.5, reference: 0.5 });
+    expect(playbackRates({ rate: 1, speed: 1 })).toEqual({ take: 1, reference: 1 });
+  });
+
+  test("the raw clip plays at speed / rate", () => {
+    expect(playbackRates({ rate: 0.75, speed: 1 }).take).toBeCloseTo(4 / 3, 12);
+    expect(playbackRates({ rate: 0.5, speed: 0.75 }).take).toBe(1.5);
+  });
+
+  test("reviewing at the practice speed plays the raw clip exactly as filmed", () => {
+    for (const rate of [0.5, 0.75, 1]) {
+      expect(playbackRates({ rate, speed: rate }).take).toBe(1);
+    }
+  });
+});
+
+describe("segmented control keys", () => {
+  const OPTIONS = [{ value: "a" }, { value: "b", disabled: true }, { value: "c" }];
+
+  test("arrows move to the next enabled option, wrapping around", () => {
+    expect(nextOption(OPTIONS, "a", 1)).toBe("c");
+    expect(nextOption(OPTIONS, "c", 1)).toBe("a");
+    expect(nextOption(OPTIONS, "a", -1)).toBe("c");
+    expect(nextOption(OPTIONS, "c", -1)).toBe("a");
+  });
+
+  test("with nothing else enabled there's nowhere to go", () => {
+    expect(nextOption([{ value: "a" }, { value: "b", disabled: true }], "a", 1)).toBeNull();
+  });
+
+  test("numbers work as values", () => {
+    expect(nextOption([{ value: 0.5 }, { value: 0.75 }, { value: 1 }], 0.75, 1)).toBe(1);
   });
 });

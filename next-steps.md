@@ -111,7 +111,7 @@ These come from `TODO.md`, and each one has its own spec. Recommended order:
 | # | Feature | Spec | Size | Depends on |
 |---|---|---|---|---|
 | 1 | Instant preview (watch before rendering) | [instant-preview.md](specs/instant-preview.md) | M | — |
-| 2 | Review speed on Watch (0.5× / 0.75× / 1×) | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
+| 2 | Review speed on Watch (0.5× / 0.75× / 1×) — **done** (on the rendered take; instant preview passes the matched rate to `playbackRates`) | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
 | 3 | Manual alignment + speed tuning | [manual-alignment.md](specs/manual-alignment.md) | S–M | 1 |
 | 4 | Layouts: side by side, stacked, take only | [layouts.md](specs/layouts.md) | S | 1 (easier after) |
 | 5 | YouTube import | [youtube-import.md](specs/youtube-import.md) | S–M | access control before exposing it on the internet |

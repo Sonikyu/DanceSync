@@ -50,6 +50,19 @@ export function renderParams(clip, sound, layout) {
   };
 }
 
+// The option `step` places (+1 or -1) after `value` in a segmented control,
+// wrapping around and skipping disabled ones. Null when nothing else is
+// enabled.
+export function nextOption(options, value, step) {
+  const count = options.length;
+  const start = Math.max(options.findIndex((option) => option.value === value), 0);
+  for (let moved = 1; moved < count; moved++) {
+    const option = options[(((start + step * moved) % count) + count) % count];
+    if (!option.disabled) return option.value;
+  }
+  return null;
+}
+
 // "strongest match" for the winner, "93% as strong" for each runner-up.
 export function strengthLabel(candidates, index) {
   if (index === 0) return "strongest match";
@@ -77,6 +90,18 @@ export function clipTimeFor(outputSec, rate) {
 
 export function outputTimeFor(clipSec, rate) {
   return clipSec * rate;
+}
+
+// Review speeds, as fractions of the song's tempo.
+export const REVIEW_SPEEDS = [0.5, 0.75, 1];
+
+// `playbackRate`s for reviewing at `speed`. The song always plays at `speed`.
+// `rate` is the take media's own speed relative to the song: 1 for a
+// rendered take, which is already at full tempo, or the matched rate for the
+// raw clip, which then plays at speed / rate -- exactly 1.0, as filmed, when
+// the dancer reviews at the speed they practised.
+export function playbackRates({ rate, speed }) {
+  return { take: speed / rate, reference: speed };
 }
 
 // The element making the sound is the clock and the muted one follows it:
