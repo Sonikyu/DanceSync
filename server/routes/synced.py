@@ -14,7 +14,7 @@ from dancesync.sync import Sound
 from server import config, render_cache
 from server.catalog import Catalog
 from server.deps import get_catalog, get_storage
-from server.models import Candidate, Clip, Layout
+from server.models import Candidate, Clip, Layout, RenderParams, render_cache_id
 from server.storage import LocalStorage
 from server.worker import sync_clip
 
@@ -42,17 +42,14 @@ def download_synced(
     if reference is None:
         raise HTTPException(404, f"no reference with id {clip.reference_id}")
 
-    candidate = _chosen_candidate(clip)
+    params = _render_params(clip, sound, layout)
     clip_path = storage.path_for("clips", clip.id, Path(clip.filename).suffix.lower())
     reference_suffix = Path(reference.filename).suffix.lower()
     reference_path = storage.path_for("references", reference.id, reference_suffix)
-    out_path = storage.path_for("synced", _synced_id(clip, candidate, sound, layout), ".mp4")
+    out_path = storage.path_for("synced", render_cache_id(params), ".mp4")
 
     try:
-        rendered = sync_clip(
-            clip_path, reference_path, candidate.rate, candidate.offset_sec, out_path,
-            sound=sound, layout=layout,
-        )
+        rendered = sync_clip(clip_path, reference_path, params, out_path)
     except SyncError as exc:
         raise HTTPException(422, str(exc)) from exc
 
@@ -60,7 +57,7 @@ def download_synced(
     if rendered:
         render_cache.sweep(out_path.parent, config.RENDER_CACHE_MAX_BYTES, keep=out_path)
 
-    return FileResponse(out_path, media_type="video/mp4", filename=_download_name(clip, sound, layout))
+    return FileResponse(out_path, media_type="video/mp4", filename=_download_name(clip, params))
 
 
 def _chosen_candidate(clip: Clip) -> Candidate:
@@ -69,16 +66,22 @@ def _chosen_candidate(clip: Clip) -> Candidate:
     return clip.alignment.top_candidates[0 if index is None else index]
 
 
-def _synced_id(clip: Clip, candidate: Candidate, sound: Sound, layout: Layout) -> str:
-    """Name the render after everything it depends on -- clip bytes, reference
-    bytes, the chosen alignment, and which render -- so a cached file is never
-    stale, even if the same clip is later re-uploaded against a different reference."""
-    offset_ms = round(candidate.offset_sec * 1000)
-    return f"{clip.id}-{clip.reference_id}-{candidate.rate}x-{offset_ms}ms-{layout}-{sound}"
+def _render_params(clip: Clip, sound: Sound, layout: Layout) -> RenderParams:
+    """What this request renders. The alignment comes from the catalog, not
+    the URL: the browser's copy of it only keeps its own cache honest."""
+    candidate = _chosen_candidate(clip)
+    return RenderParams(
+        clip_id=clip.id,
+        reference_id=clip.reference_id,
+        rate=candidate.rate,
+        offset_sec=candidate.offset_sec,
+        layout=layout,
+        sound=sound,
+    )
 
 
-def _download_name(clip: Clip, sound: Sound, layout: Layout) -> str:
+def _download_name(clip: Clip, params: RenderParams) -> str:
     """practice-synced.mp4, practice-side-by-side-room.mp4, and so on."""
-    kind = "synced" if layout == "take" else "side-by-side"
-    sound_suffix = "" if sound == "song" else f"-{sound}"
+    kind = "synced" if params.layout == "take" else "side-by-side"
+    sound_suffix = "" if params.sound == "song" else f"-{params.sound}"
     return f"{Path(clip.filename).stem}-{kind}{sound_suffix}.mp4"

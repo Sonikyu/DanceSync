@@ -61,9 +61,9 @@ class Trim(BaseModel):
 
 ## Cache invariant
 
-A render's filename (`_synced_id`) must name everything the render depends on. Add a short hash of `(reference.framing, clip.framing, clip.trim)` to it, or the server will serve a cached render with the old edits.
+A render's filename must name everything the render depends on. Add a short hash of `(reference.framing, clip.framing, clip.trim)` as a field of `RenderParams` (DS-03), or the server will serve a cached render with the old edits.
 
-**The browser also caches by URL,** so `syncedVideoUrl` needs the same hash in its query string, the way `candidate` is there today. Leaving this out is the bug this feature is most likely to ship with.
+**The browser also caches by URL,** so the same field goes in `RENDER_PARAM_FIELDS` in `api.js` and in `flow.renderParams`. `tests/test_render_params.py` fails if the field is on one side only, which is the bug this feature is most likely to ship with.
 
 ## ffmpeg
 
@@ -96,7 +96,7 @@ The server validates the crop (inside 0..1 and at least `MIN_CROP_FRAC`) and the
 - `framing.py`: filter strings for each edit and each combination; rounding to even dimensions.
 - `trimmed_offset`: with a trim, the rendered audio still lines up. Reuse `test_sync.py`'s approach of rendering a synthetic clip and checking where the reference audio lands.
 - Render dimensions after crop and rotate, checked with ffprobe.
-- API: the PUT endpoints, their validation errors, and a changed edit producing a different `_synced_id`.
+- API: the PUT endpoints, their validation errors, and a changed edit producing a different `render_cache_id`.
 - `flow.test.js`: `framingStyle`, the mirrored-crop conversion, and time mapping with a trim.
 
 ## Acceptance criteria

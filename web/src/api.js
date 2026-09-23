@@ -57,11 +57,20 @@ export function referenceMediaUrl(referenceId) {
   return `/api/references/${referenceId}/media`;
 }
 
-// `sound` is "song" or "room"; `layout` is "take" or "side-by-side". The
-// server renders whichever candidate is selected -- `candidate` in the query
-// only stops the browser replaying a cached render of a different one.
-export function syncedVideoUrl(clipId, candidateIndex, sound, layout) {
-  const query = new URLSearchParams({ candidate: candidateIndex, sound, layout });
+// Everything a render depends on besides the clip, which is in the URL's
+// path. Mirrors the server's RenderParams, and tests/test_render_params.py
+// fails if the two drift. Every field goes in the URL, so a render that
+// changes never replays from the browser's cache (invariant 7).
+export const RENDER_PARAM_FIELDS = ["reference_id", "rate", "offset_sec", "layout", "sound"];
+
+// `renderParams` comes from flow.renderParams. The server reads `sound` and
+// `layout` from the query and the alignment from its own catalog.
+export function syncedVideoUrl(clipId, renderParams) {
+  const query = new URLSearchParams();
+  for (const field of RENDER_PARAM_FIELDS) {
+    if (renderParams[field] === undefined) throw new Error(`syncedVideoUrl: missing ${field}`);
+    query.set(field, renderParams[field]);
+  }
   return `/api/clips/${clipId}/synced?${query}`;
 }
 

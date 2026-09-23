@@ -30,6 +30,8 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 | 5. Polish & deploy | Not started; the items marked **MVP** are what's left before the MVP is done |
 | Post-MVP features | Specced in [`specs/`](specs/) |
 
+Invariant 7 (render cache names) is enforced by one `RenderParams` record shared by the server's cache id and the browser's URL, with a test that fails if they drift (DS-03).
+
 pytest covers the Tier A matcher regression, the ambiguity threshold, the API routes, and real ffmpeg renders. Vitest covers the UI's pure helpers in `web/src/flow.js`.
 
 ---

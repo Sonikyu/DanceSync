@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from dancesync.sync import Sound
+
 # Which synced render: the take alone, or side by side with the reference video.
 Layout = Literal["take", "side-by-side"]
 
@@ -62,3 +64,30 @@ class SignInRequest(BaseModel):
 
 class SessionStatus(BaseModel):
     signed_in: bool
+
+
+class RenderParams(BaseModel):
+    """Everything a synced render depends on (invariant 7). Its cache id is
+    built from every field, and the browser's `/synced` URL carries every
+    field but `clip_id`, which is in the path. `RENDER_PARAM_FIELDS` in
+    `web/src/api.js` lists them for the browser; a test fails if the two
+    lists drift. Anything new that changes a render's picture or sound is a
+    new field here."""
+
+    clip_id: str
+    reference_id: str
+    rate: float
+    offset_sec: float
+    layout: Layout
+    sound: Sound
+
+
+def render_cache_id(params: RenderParams) -> str:
+    """The render's filename stem: every field's value, in field order, so a
+    new field changes it with no edit here. Floats keep full precision, since
+    rounding could file two different renders under one name."""
+    return "-".join(_cache_id_token(value) for value in params.model_dump().values())
+
+
+def _cache_id_token(value: object) -> str:
+    return repr(value) if isinstance(value, float) else str(value)

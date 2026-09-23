@@ -5,6 +5,7 @@ import {
   formatRate,
   formatTime,
   referenceTimeFor,
+  renderParams,
   songTitle,
   stageOf,
   stepAfterAlignment,
@@ -98,5 +99,18 @@ describe("formatting", () => {
   test("song titles drop the file extension", () => {
     expect(songTitle("Levitating.mp3")).toBe("Levitating");
     expect(songTitle("dance.practice.mp4")).toBe("dance.practice");
+  });
+});
+
+describe("render params", () => {
+  test("carry the chosen candidate's alignment and the requested render", () => {
+    const clip = { reference_id: "ref", ...clipWith({ selected_index: 1 }) };
+    expect(renderParams(clip, "room", "side-by-side")).toEqual({
+      reference_id: "ref",
+      rate: 0.75,
+      offset_sec: 132.0,
+      layout: "side-by-side",
+      sound: "room",
+    });
   });
 });

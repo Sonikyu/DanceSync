@@ -12,9 +12,8 @@ from pathlib import Path
 
 from dancesync import audio, matcher, sync
 from dancesync.config import MIN_CLIP_SEC
-from dancesync.sync import Sound
 from dancesync.types import MatchResult
-from server.models import Layout
+from server.models import RenderParams
 
 
 class ClipTooShortError(ValueError):
@@ -34,22 +33,16 @@ def align_clip(clip_path: Path, reference_path: Path, reference_id: str) -> Matc
     return matcher.match(clip_audio, ref_audio, ref_features=ref_features)
 
 
-def sync_clip(
-    clip_path: Path,
-    reference_path: Path,
-    rate: float,
-    offset_sec: float,
-    out_path: Path,
-    sound: Sound,
-    layout: Layout,
-) -> bool:
+def sync_clip(clip_path: Path, reference_path: Path, params: RenderParams, out_path: Path) -> bool:
     """Render the synced video unless an earlier request already did, and
-    say whether it rendered. The caller names `out_path` after everything
-    the render depends on, so an existing file is never stale."""
+    say whether it rendered. The caller names `out_path` after `params`
+    (`render_cache_id`), so an existing file is never stale."""
     if out_path.exists():
         return False
-    if layout == "side-by-side":
-        sync.render_side_by_side(clip_path, reference_path, rate, offset_sec, out_path, sound)
+    if params.layout == "side-by-side":
+        sync.render_side_by_side(
+            clip_path, reference_path, params.rate, params.offset_sec, out_path, params.sound
+        )
     else:
-        sync.render_synced(clip_path, reference_path, rate, offset_sec, out_path, sound)
+        sync.render_synced(clip_path, reference_path, params.rate, params.offset_sec, out_path, params.sound)
     return True

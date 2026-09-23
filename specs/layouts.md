@@ -16,7 +16,7 @@ On Watch, the user picks a layout: **Side by side**, **Stacked**, or **Take only
 ## Key decisions
 
 - **What you see is what you download.** The two download buttons become one, which renders the current layout and sound.
-- **`Layout = Literal["take", "side-by-side", "stacked"]`** in `server/models.py`. `_synced_id` already includes the layout, so the cache needs nothing new. `_download_name` needs a third case (`…-stacked.mp4`).
+- **`Layout = Literal["take", "side-by-side", "stacked"]`** in `server/models.py`. `layout` is already a `RenderParams` field, so the cache needs nothing new. `_download_name` needs a third case (`…-stacked.mp4`).
 - **One compare command, not two.** `build_side_by_side_command` becomes `build_compare_command(..., layout)`. The two layouts differ only in their fit filter and their stack filter:
   - side by side: `scale=-2:{COMPARE_HEIGHT}` then `hstack` (same height)
   - stacked: `scale={COMPARE_WIDTH}:-2` then `vstack` (same width)

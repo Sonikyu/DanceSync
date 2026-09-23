@@ -76,7 +76,7 @@ docker compose up -d --build                          # production-style: one co
   4. `matcher.match` produces the `AlignmentResult`: the top 3 candidates plus the `ambiguous` flag (`peak_ratio` < `AMBIGUOUS_PEAK_RATIO`) and the `failed` flag (winning score < `MIN_MATCH_SCORE`). It's saved in the catalog. Clips under `MIN_CLIP_SEC` are rejected with 422 before matching.
 - **Render** (runs on `HEAD`/`GET /api/clips/{id}/synced`):
   1. `routes/synced.py` picks the chosen candidate, or the best one if the user never picked.
-  2. `worker.sync_clip` calls `sync.render_synced` or `sync.render_side_by_side`.
+  2. The route builds a `RenderParams` from the clip's chosen candidate plus `sound`/`layout`, and `worker.sync_clip` calls `sync.render_synced` or `sync.render_side_by_side` with it.
   3. `ffmpeg.run_to_file` writes the output. Its filename encodes every input, so an existing file is served as-is.
   4. `render_cache.touch` marks it used; after a new render, `render_cache.sweep` deletes the least recently used renders past `RENDER_CACHE_MAX_BYTES`.
 - **Watch** (in the browser): `ComparePlayer` plays the rendered take and the reference media on one play bar. `useLinkedPlayback` treats the take as the clock and nudges the muted reference's `playbackRate` to keep up.
@@ -91,7 +91,7 @@ docker compose up -d --build                          # production-style: one co
 4. **`peak_ratio` detects ambiguity.** Self-similar music (repeated choruses) produces tied peaks. `peak_ratio` is the winner divided by the best peak outside an exclusion window. At upload, `AMBIGUOUS_PEAK_RATIO` (1.2, measured) decides whether the user has to pick from the top 3.
 5. **Parameters live in config, not inline.** Several must agree across modules.
 6. **Renders and playback share one timing model.** Clip time `t` heard reference time `offset_sec + t × rate`. Output time `T` shows clip time `T / rate` over reference time `offset_sec + T`. `sync.py`'s module docstring states this for ffmpeg, and `flow.referenceTimeFor` states it for the browser. If you change one, change the other.
-7. **Render cache names encode every input.** `_synced_id` in `routes/synced.py` names each render after the clip, reference, rate, offset, layout, and sound. Anything new that changes the picture or audio (edits, layouts, speeds) must go into that name *and* into the URL query in `api.syncedVideoUrl`. Otherwise the server or the browser serves a stale file.
+7. **Render cache names encode every input.** Everything a render depends on is a field of `RenderParams` in `server/models.py`: clip, reference, rate, offset, layout, and sound. `render_cache_id` names the file after every field, and the browser's `/synced` URL carries every field too (`RENDER_PARAM_FIELDS` in `api.js`, filled by `flow.renderParams`). Anything new that changes the picture or audio (edits, layouts, speeds) is a new field there, added to `RENDER_PARAM_FIELDS` as well; `tests/test_render_params.py` fails if the two lists drift. Otherwise the server or the browser serves a stale file.
 
 ## Gotchas
 

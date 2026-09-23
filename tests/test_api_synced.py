@@ -68,8 +68,8 @@ def test_synced_uses_selected_candidate(client, monkeypatch):
 
     rendered = {}
 
-    def fake_sync_clip(clip_path, reference_path, rate, offset_sec, out_path, sound, layout):
-        rendered.update(rate=rate, offset_sec=offset_sec)
+    def fake_sync_clip(clip_path, reference_path, params, out_path):
+        rendered.update(rate=params.rate, offset_sec=params.offset_sec)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"not really an mp4")
 
@@ -89,7 +89,7 @@ def test_synced_head_renders_without_sending_the_video(client, monkeypatch):
     body = upload_clip(client, reference["id"], clip.audio)
     fake_video = b"not really an mp4"
 
-    def fake_sync_clip(clip_path, reference_path, rate, offset_sec, out_path, sound, layout):
+    def fake_sync_clip(clip_path, reference_path, params, out_path):
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(fake_video)
 
@@ -108,8 +108,8 @@ def test_synced_sound_and_layout_pick_the_render(client, monkeypatch):
     body = upload_clip(client, reference["id"], clip.audio)
     renders = []
 
-    def fake_sync_clip(clip_path, reference_path, rate, offset_sec, out_path, sound, layout):
-        renders.append((sound, layout, out_path.name))
+    def fake_sync_clip(clip_path, reference_path, params, out_path):
+        renders.append((params.sound, params.layout, out_path.name))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"not really an mp4")
 

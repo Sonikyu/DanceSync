@@ -29,12 +29,25 @@ export function clipTooShortMessage(durationSec, minSec) {
 
 // The user's pick if they made one, else the matcher's best guess -- the same
 // rule the server applies when it renders.
-export function chosenIndex(clip) {
+function chosenIndex(clip) {
   return clip.alignment.selected_index ?? 0;
 }
 
 export function chosenCandidate(clip) {
   return clip.alignment.top_candidates[chosenIndex(clip)];
+}
+
+// What a /synced render depends on, for api.syncedVideoUrl: the clip's song,
+// the alignment it plays at, and which render.
+export function renderParams(clip, sound, layout) {
+  const candidate = chosenCandidate(clip);
+  return {
+    reference_id: clip.reference_id,
+    rate: candidate.rate,
+    offset_sec: candidate.offset_sec,
+    layout,
+    sound,
+  };
 }
 
 // "strongest match" for the winner, "93% as strong" for each runner-up.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { referenceMediaUrl, renderSynced, syncedVideoUrl } from "../api.js";
-import { chosenCandidate, chosenIndex, formatRate, formatTime } from "../flow.js";
+import { chosenCandidate, formatRate, formatTime, renderParams } from "../flow.js";
 import ComparePlayer from "./ComparePlayer.jsx";
 import DownloadButton from "./DownloadButton.jsx";
 import Working from "./Working.jsx";
@@ -11,22 +11,24 @@ export default function WatchStep({ song, clip, onChangeMatch, onNewTake }) {
   const [roomAvailable, setRoomAvailable] = useState(false);
   const [hasReferenceVideo, setHasReferenceVideo] = useState(false);
   const [error, setError] = useState(null);
-  const index = chosenIndex(clip);
   const candidate = chosenCandidate(clip);
+  const videoUrl = (sound, layout) => syncedVideoUrl(clip.id, renderParams(clip, sound, layout));
+  const songTakeUrl = videoUrl("song", "take");
+  const roomTakeUrl = videoUrl("room", "take");
 
   // Both sounds render up front, so switching between them is instant. Only
   // the song is required: if the room render fails, Room just stays off.
   useEffect(() => {
-    renderSynced(syncedVideoUrl(clip.id, index, "room", "take"))
+    renderSynced(roomTakeUrl)
       .then(() => setRoomAvailable(true))
       .catch(() => setRoomAvailable(false));
-    renderSynced(syncedVideoUrl(clip.id, index, "song", "take"))
+    renderSynced(songTakeUrl)
       .then(() => setStatus("ready"))
       .catch((err) => {
         setError(err.message);
         setStatus("failed");
       });
-  }, [clip.id, index]);
+  }, [songTakeUrl, roomTakeUrl]);
 
   return (
     <section className="step">
@@ -38,7 +40,7 @@ export default function WatchStep({ song, clip, onChangeMatch, onNewTake }) {
       {status === "ready" && (
         <ComparePlayer
           referenceUrl={referenceMediaUrl(song.id)}
-          takeUrl={syncedVideoUrl(clip.id, index, sound, "take")}
+          takeUrl={videoUrl(sound, "take")}
           offsetSec={candidate.offset_sec}
           sound={sound}
           roomAvailable={roomAvailable}
@@ -55,14 +57,14 @@ export default function WatchStep({ song, clip, onChangeMatch, onNewTake }) {
         <div className="actions">
           {hasReferenceVideo && (
             <DownloadButton
-              url={syncedVideoUrl(clip.id, index, sound, "side-by-side")}
+              url={videoUrl(sound, "side-by-side")}
               label="Side by side"
               onError={setError}
             />
           )}
           <DownloadButton
             primary
-            url={syncedVideoUrl(clip.id, index, sound, "take")}
+            url={videoUrl(sound, "take")}
             label={hasReferenceVideo ? "Your take" : "Download"}
             onError={setError}
           />
