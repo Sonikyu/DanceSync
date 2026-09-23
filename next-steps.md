@@ -112,7 +112,7 @@ These come from `TODO.md`, and each one has its own spec. Recommended order:
 |---|---|---|---|---|
 | 1 | Instant preview (watch before rendering) — **partly done**: the player leads from the sound-making element and re-times one room render live (DS-17, and DS-18's timing); playing the raw clip instead of that render, with a fallback (DS-18, DS-19), is left | [instant-preview.md](specs/instant-preview.md) | M | — |
 | 2 | Review speed on Watch (0.5× / 0.75× / 1×) — **done** (on the rendered take; instant preview passes the matched rate to `playbackRates`) | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
-| 3 | Manual alignment + speed tuning | [manual-alignment.md](specs/manual-alignment.md) | S–M | 1 |
+| 3 | Manual alignment + speed tuning — **done** (fine-tune panel, Both sound, manual placement on failure) | [manual-alignment.md](specs/manual-alignment.md) | S–M | 1 |
 | 4 | Layouts: side by side, stacked, take only — **done** | [layouts.md](specs/layouts.md) | S | 1 (easier after) |
 | 5 | YouTube import | [youtube-import.md](specs/youtube-import.md) | S–M | access control before exposing it on the internet |
 | 6 | Basic editing: crop, mirror, rotate, trim | [video-editing.md](specs/video-editing.md) | M | 1 |

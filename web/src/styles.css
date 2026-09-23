@@ -71,6 +71,9 @@ button:focus-visible, a:focus-visible, .dropzone:focus-within { outline: 2px sol
 
 .actions { display: flex; gap: 12px; margin-top: auto; padding-top: 16px; }
 .actions > * { flex: 1; }
+.actions.stacked-actions { flex-direction: column; }
+.actions-row { display: flex; gap: 12px; }
+.actions-row > * { flex: 1; }
 
 /* --- Sign in --- */
 
@@ -113,6 +116,15 @@ button:focus-visible, a:focus-visible, .dropzone:focus-within { outline: 2px sol
 .timeline-track { position: absolute; top: 12px; right: -12px; left: -12px; height: 4px; border-radius: 2px; background: var(--border); }
 .timeline-marker { position: absolute; top: 2px; display: grid; place-items: center; width: 24px; height: 24px; margin-left: -12px; border: 2px solid var(--bg); border-radius: 50%; background: var(--text-muted); color: var(--bg); font-size: 12px; font-weight: 600; transition: background 0.15s; }
 .timeline-marker.active { background: var(--accent); }
+/* Placing a take by hand: an invisible range input over the track does the
+   dragging and the keyboard; its thumb is as wide as the marker, and the input
+   overhangs the bar by half of that, so the thumb's centre is the marker's. */
+.timeline-input { position: absolute; top: 0; right: -12px; left: -12px; width: calc(100% + 24px); height: 28px; margin: 0; opacity: 0; cursor: pointer; }
+.timeline-input::-webkit-slider-thumb { width: 24px; height: 24px; -webkit-appearance: none; }
+.timeline-input::-moz-range-thumb { width: 24px; height: 24px; }
+.timeline:focus-within .timeline-marker { outline: 2px solid var(--accent); outline-offset: 2px; }
+.place-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
 .timeline-ends { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .cards { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 0; padding: 0; list-style: none; }
@@ -146,13 +158,25 @@ button:focus-visible, a:focus-visible, .dropzone:focus-within { outline: 2px sol
 .scrubber { flex: 1; min-width: 0; accent-color: var(--accent); }
 .playbar-time { color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+.fine-tune { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.tune-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+.tune-row .button.small { padding: 0 10px; font-variant-numeric: tabular-nums; }
+.tune-label { flex-basis: 100%; text-align: center; }
+.tune-value { min-width: 76px; font-variant-numeric: tabular-nums; font-weight: 600; text-align: center; }
+.tune-actions { display: flex; align-items: center; gap: 12px; }
+.tune-actions .link { margin-right: auto; font-size: 14px; }
+
 .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 24px; }
 .control { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; }
 .segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--border); }
 .segmented button { height: 30px; padding: 0 16px; border: 0; border-radius: 7px; background: none; color: var(--text-muted); font: inherit; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; }
 .segmented button[aria-checked="true"] { background: var(--surface); color: var(--text); }
 .segmented button:disabled { color: var(--border-strong); cursor: default; }
-/* Room for Layout's three options on a phone. */
+/* Room for Layout's three options, and the four offset buttons, on a phone. */
 @media (max-width: 420px) {
   .segmented button { padding: 0 10px; }
+  .fine-tune { padding: 12px; }
+  .tune-row { gap: 4px; }
+  .tune-row .button.small { padding: 0 8px; }
+  .tune-value { min-width: 64px; }
 }

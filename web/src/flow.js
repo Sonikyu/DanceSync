@@ -3,10 +3,11 @@
 
 // The header dots show three stages. Checking an ambiguous match counts as
 // part of the video stage, so the dots never skip ahead when it's not needed.
-// "No match" stands in for the player, so it's the watch stage.
+// "No match" stands in for the player, so it's the watch stage; placing the
+// take by hand afterwards stands in for the match step.
 export const STAGES = ["Song", "Video", "Watch"];
 
-const STAGE_OF_STEP = { song: 0, video: 1, match: 1, watch: 2, nomatch: 2 };
+const STAGE_OF_STEP = { song: 0, video: 1, match: 1, place: 1, watch: 2, nomatch: 2 };
 
 export function stageOf(step) {
   return STAGE_OF_STEP[step];
