@@ -81,7 +81,7 @@ def _render_params(clip: Clip, sound: Sound, layout: Layout) -> RenderParams:
 
 
 def _download_name(clip: Clip, params: RenderParams) -> str:
-    """practice-synced.mp4, practice-side-by-side-room.mp4, and so on."""
-    kind = "synced" if params.layout == "take" else "side-by-side"
+    """practice-synced.mp4, practice-side-by-side-room.mp4, practice-stacked.mp4, and so on."""
+    kind = "synced" if params.layout == "take" else params.layout
     sound_suffix = "" if params.sound == "song" else f"-{params.sound}"
     return f"{Path(clip.filename).stem}-{kind}{sound_suffix}.mp4"

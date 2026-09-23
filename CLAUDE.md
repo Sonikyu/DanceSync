@@ -20,7 +20,7 @@ DanceSync/
 │   ├── features.py           # chroma_cqt + z-score, frames_to_sec
 │   ├── matcher.py            # sliding correlation, peaks, rate search, match()
 │   ├── types.py              # Candidate, MatchResult
-│   ├── sync.py               # what to render: ffmpeg filtergraphs for the synced / side-by-side video
+│   ├── sync.py               # what to render: ffmpeg filtergraphs for the synced take / compare (side-by-side, stacked) video
 │   └── ffmpeg.py             # how to run ffmpeg: presence check, probe, encoder args, atomic writes
 ├── server/                   # FastAPI app
 │   ├── main.py               # app, CORS, routers
@@ -76,10 +76,10 @@ docker compose up -d --build                          # production-style: one co
   4. `matcher.match` produces the `AlignmentResult`: the top 3 candidates plus the `ambiguous` flag (`peak_ratio` < `AMBIGUOUS_PEAK_RATIO`) and the `failed` flag (winning score < `MIN_MATCH_SCORE`). It's saved in the catalog. Clips under `MIN_CLIP_SEC` are rejected with 422 before matching.
 - **Render** (runs on `HEAD`/`GET /api/clips/{id}/synced`):
   1. `routes/synced.py` picks the chosen candidate, or the best one if the user never picked.
-  2. The route builds a `RenderParams` from the clip's chosen candidate plus `sound`/`layout`, and `worker.sync_clip` calls `sync.render_synced` or `sync.render_side_by_side` with it.
+  2. The route builds a `RenderParams` from the clip's chosen candidate plus `sound`/`layout`, and `worker.sync_clip` calls `sync.render_synced` (layout `take`) or `sync.render_compare` (`side-by-side`, `stacked`) with it.
   3. `ffmpeg.run_to_file` writes the output. Its filename encodes every input, so an existing file is served as-is.
   4. `render_cache.touch` marks it used; after a new render, `render_cache.sweep` deletes the least recently used renders past `RENDER_CACHE_MAX_BYTES`.
-- **Watch** (in the browser): `ComparePlayer` plays the rendered take and the reference media on one play bar. `useLinkedPlayback` treats the take as the clock and nudges the muted reference's `playbackRate` to keep up. Review speed (0.5×/0.75×/1×) sets both base rates through `flow.playbackRates`, and the nudge is around that base; downloads are unaffected.
+- **Watch** (in the browser): `ComparePlayer` plays the rendered take and the reference media on one play bar. `useLinkedPlayback` treats the take as the clock and nudges the muted reference's `playbackRate` to keep up. Review speed (0.5×/0.75×/1×) sets both base rates through `flow.playbackRates`, and the nudge is around that base; downloads are unaffected. The layout (side by side, stacked, take only; `flow.layoutFor`) is a class on `.compare`, and the one Download button renders that layout and sound.
 
 `dancesync/` never imports from `server/`, and `server/` reaches the matcher and renderer only through `worker.py`.
 
@@ -100,7 +100,7 @@ docker compose up -d --build                          # production-style: one co
 - **Tier A failures are code bugs, not findings.** If the synthetic gate fails after a matcher change, the change broke something. Don't debug it with real recordings.
 - **iOS Safari won't fetch a `<video>` source until play is pressed.** So the UI sends a `HEAD` to `/synced` to trigger the render before handing the URL to the player. iOS also lets an element play unmuted only if a user gesture started it.
 - **Two `<video>` elements never stay in lockstep on their own.** One is the clock, and the other is steered: small `playbackRate` nudges, with a seek only past 0.5 s of drift. Seeking on every drift stalls on keyframe decodes.
-- **Re-timed takes have unusual frame rates.** A 30 fps clip at 0.75x becomes 40 fps. `-fps_mode passthrough` and `-enc_time_base:v filter` keep every frame, because resampling to 30 visibly stutters. The side-by-side render puts both inputs on a 60 fps grid before `hstack`.
+- **Re-timed takes have unusual frame rates.** A 30 fps clip at 0.75x becomes 40 fps. `-fps_mode passthrough` and `-enc_time_base:v filter` keep every frame, because resampling to 30 visibly stutters. The compare renders put both inputs on a 60 fps grid before `hstack`/`vstack`.
 - **Synthetic songs all share one eight-chord vocabulary,** so two different `make_reference` seeds score 5–7 against each other, well above `MIN_MATCH_SCORE`. A synthetic "wrong song" needs to be transposed out of those chords (see `test_ambiguity.py`); real songs don't have this problem.
 - **`peak_ratio` can be infinite** when nothing competes with the winner. The API sends it as `null`.
 - **With `DANCESYNC_PASSPHRASE` set, every `/api` call needs the session cookie.** `<video>`/`<audio>` send it on range requests because everything is same-origin; a cross-origin frontend would need credentialed CORS.

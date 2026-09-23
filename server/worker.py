@@ -39,10 +39,10 @@ def sync_clip(clip_path: Path, reference_path: Path, params: RenderParams, out_p
     (`render_cache_id`), so an existing file is never stale."""
     if out_path.exists():
         return False
-    if params.layout == "side-by-side":
-        sync.render_side_by_side(
-            clip_path, reference_path, params.rate, params.offset_sec, out_path, params.sound
-        )
-    else:
+    if params.layout == "take":
         sync.render_synced(clip_path, reference_path, params.rate, params.offset_sec, out_path, params.sound)
+    else:
+        sync.render_compare(
+            clip_path, reference_path, params.rate, params.offset_sec, out_path, params.layout, params.sound
+        )
     return True

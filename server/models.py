@@ -9,8 +9,9 @@ from pydantic import BaseModel
 
 from dancesync.sync import Sound
 
-# Which synced render: the take alone, or side by side with the reference video.
-Layout = Literal["take", "side-by-side"]
+# Which synced render: the take alone, or with the reference video beside it
+# or above it.
+Layout = Literal["take", "side-by-side", "stacked"]
 
 
 class Candidate(BaseModel):

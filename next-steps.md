@@ -15,7 +15,7 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 1. **Song:** pick a song used before, or upload a new one (an audio file, or a video of the choreography).
 2. **Video:** upload the practice video. The server aligns it, which takes 10–30 s.
 3. **Match:** this step appears only when the match is ambiguous (a repeated chorus, `peak_ratio` < 1.2). It shows the top 3 candidates on a song timeline and plays 8 s of the song at each one, and the user picks the right one.
-4. **Watch:** the synced take plays next to the reference video, with one play bar for both. The sound can be the song or the room (the phone's own recording). The user can download the take on its own or the side-by-side version.
+4. **Watch:** the synced take plays next to the reference video, with one play bar for both. The sound can be the song or the room (the phone's own recording). The user can slow the review to 0.5× or 0.75×, pick a layout (side by side, stacked, or take only), and download exactly what's on screen.
 
 ---
 
@@ -58,7 +58,7 @@ Built as planned: FastAPI, local storage keyed by content hash, alignment done s
 Endpoints:
 - `POST /api/references`, `GET /api/references`, `GET /api/references/{id}/media`
 - `POST /api/clips`, `GET /api/clips/{id}`, `GET /api/clips/{id}/media` (the uploaded take, with range requests; for instant preview), `POST /api/clips/{id}/select`
-- `GET|HEAD /api/clips/{id}/synced?sound=song|room&layout=take|side-by-side`
+- `GET|HEAD /api/clips/{id}/synced?sound=song|room&layout=take|side-by-side|stacked`
 
 ### Phase 3 — Video sync engine (`dancesync/sync.py`, `dancesync/ffmpeg.py`)
 
@@ -66,7 +66,7 @@ Built as planned: one ffmpeg command per render, `setpts=PTS*rate`, and the refe
 
 - **Every captured frame is kept** (`-fps_mode passthrough`). A 30 fps take at 0.75x comes out at 40 fps instead of losing frames.
 - **Two sounds:** `song` (the reference track) or `room` (the phone's own recording, sped up with `atempo`).
-- **Two layouts:** `take` alone, or `side-by-side`, with the reference video on the left. Both videos are scaled to 720 px high and put on a 60 fps grid.
+- **Three layouts:** `take` alone, `side-by-side` (reference on the left, both 720 px high), or `stacked` (reference on top, both 720 px wide; added post-MVP). The last two are one `build_compare_command` on a 60 fps grid.
 - **Renders are cached** under a filename that encodes every input. Each one is written to a temp file and then renamed, so a failed render never looks finished.
 - **`HEAD` on `/synced` renders without sending a body.** The UI waits on it because iOS Safari doesn't fetch a `<video>` source until the user presses play.
 
@@ -113,7 +113,7 @@ These come from `TODO.md`, and each one has its own spec. Recommended order:
 | 1 | Instant preview (watch before rendering) | [instant-preview.md](specs/instant-preview.md) | M | — |
 | 2 | Review speed on Watch (0.5× / 0.75× / 1×) — **done** (on the rendered take; instant preview passes the matched rate to `playbackRates`) | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
 | 3 | Manual alignment + speed tuning | [manual-alignment.md](specs/manual-alignment.md) | S–M | 1 |
-| 4 | Layouts: side by side, stacked, take only | [layouts.md](specs/layouts.md) | S | 1 (easier after) |
+| 4 | Layouts: side by side, stacked, take only — **done** | [layouts.md](specs/layouts.md) | S | 1 (easier after) |
 | 5 | YouTube import | [youtube-import.md](specs/youtube-import.md) | S–M | access control before exposing it on the internet |
 | 6 | Basic editing: crop, mirror, rotate, trim | [video-editing.md](specs/video-editing.md) | M | 1 |
 | 7 | Takes at any practice speed | [practice-speeds.md](specs/practice-speeds.md) | M | — |

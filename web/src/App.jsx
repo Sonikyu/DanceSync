@@ -17,6 +17,7 @@ export default function App() {
   const [step, setStep] = useState("song");
   const [song, setSong] = useState(null);
   const [clip, setClip] = useState(null);
+  const [layoutPick, setLayoutPick] = useState(null);   // null = the default for the screen
 
   useEffect(() => {
     // Unreachable server: carry on, so the song step shows its own error.
@@ -66,6 +67,8 @@ export default function App() {
           clip={clip}
           onChangeMatch={() => setStep("match")}
           onNewTake={() => setStep("video")}
+          layoutPick={layoutPick}
+          onLayoutPick={setLayoutPick}
         />
       )}
     </div>

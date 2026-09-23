@@ -66,11 +66,14 @@ VIDEO_CRF = 18
 VIDEO_PRESET = "veryfast"
 AUDIO_BITRATE = "192k"
 
-# Side-by-side renders scale both videos to one height and put them on one
-# frame grid. 60 fps is above any phone clip re-timed from 30 fps (40 at
-# 0.75x, 60 at 0.5x), so frames only ever get duplicated, never dropped.
-SIDE_BY_SIDE_HEIGHT = 720
-SIDE_BY_SIDE_FPS = 60
+# Compare renders put the reference beside the take (both scaled to one
+# height) or above it (both scaled to one width), on one frame grid. 60 fps
+# is above any phone clip re-timed from 30 fps (40 at 0.75x, 60 at 0.5x), so
+# frames only ever get duplicated, never dropped. Stacked is tall on purpose,
+# for phones: a landscape reference over a portrait take comes out 720x1685.
+COMPARE_HEIGHT = 720
+COMPARE_WIDTH = 720
+COMPARE_FPS = 60
 
 # --- Paths ------------------------------------------------------------------
 

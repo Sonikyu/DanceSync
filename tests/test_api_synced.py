@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 
 import pytest
 import soundfile as sf
@@ -146,3 +147,39 @@ def test_synced_audio_only_clip_rejected(client):
 
 def test_synced_unknown_clip_404s(client):
     assert client.get("/api/clips/nope/synced").status_code == 404
+
+
+@needs_ffmpeg
+def test_synced_stacked_renders_and_serves(client, tmp_path):
+    ref_audio = make_reference(duration_sec=60.0, seed=23)
+    song_path = tmp_path / "song.wav"
+    sf.write(str(song_path), ref_audio, SR)
+    choreography = tmp_path / "choreography.mp4"
+    write_flash_video(choreography, 60.0, flash_sec=30.0, audio_path=song_path, size="160x90")
+    files = {"file": ("choreography.mp4", choreography.read_bytes(), "video/mp4")}
+    reference = client.post("/api/references", files=files).json()
+
+    clip = make_clip(ref_audio, start_sec=20.0, duration_sec=15.0, rate=1.0, snr_db=10.0)
+    clip_audio_path = tmp_path / "practice.wav"
+    sf.write(str(clip_audio_path), clip.audio, SR)
+    video_path = tmp_path / "practice.mp4"
+    write_flash_video(video_path, len(clip.audio) / SR, flash_sec=4.0, audio_path=clip_audio_path)
+    files = {"file": ("practice.mp4", video_path.read_bytes(), "video/mp4")}
+    clip_id = client.post("/api/clips", params={"reference_id": reference["id"]}, files=files).json()["id"]
+
+    resp = client.get(f"/api/clips/{clip_id}/synced", params={"layout": "stacked"})
+    assert resp.status_code == 200
+    assert 'filename="practice-stacked.mp4"' in resp.headers["content-disposition"]
+    stacked_path = tmp_path / "stacked.mp4"
+    stacked_path.write_bytes(resp.content)
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries", "stream=width,height",
+         "-of", "csv=p=0", str(stacked_path)],
+        capture_output=True, text=True, check=True,
+    )
+    assert probe.stdout.strip() == "720,1126"   # a 16:9 reference (720x406) over the square take
+
+
+def test_synced_unknown_layout_rejected(client):
+    resp = client.get("/api/clips/anything/synced", params={"layout": "diagonal"})
+    assert resp.status_code == 422

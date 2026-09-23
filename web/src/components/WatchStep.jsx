@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
 import { referenceMediaUrl, renderSynced, syncedVideoUrl } from "../api.js";
-import { chosenCandidate, formatRate, formatTime, renderParams } from "../flow.js";
+import { chosenCandidate, formatRate, formatTime, layoutFor, renderParams } from "../flow.js";
 import ComparePlayer from "./ComparePlayer.jsx";
 import DownloadButton from "./DownloadButton.jsx";
+import useWideViewport from "./useWideViewport.js";
 import Working from "./Working.jsx";
 
-export default function WatchStep({ song, clip, onChangeMatch, onNewTake }) {
+// `layoutPick` lives in App, so a picked layout carries over to the next take.
+export default function WatchStep({ song, clip, onChangeMatch, onNewTake, layoutPick, onLayoutPick }) {
   const [status, setStatus] = useState("rendering");   // "rendering" | "ready" | "failed"
   const [sound, setSound] = useState("song");
   const [roomAvailable, setRoomAvailable] = useState(false);
   const [hasReferenceVideo, setHasReferenceVideo] = useState(false);
   const [error, setError] = useState(null);
+  const wideViewport = useWideViewport();
+  const layout = layoutFor({ picked: layoutPick, wideViewport, hasReferenceVideo });
   const candidate = chosenCandidate(clip);
   const videoUrl = (sound, layout) => syncedVideoUrl(clip.id, renderParams(clip, sound, layout));
   const songTakeUrl = videoUrl("song", "take");
@@ -46,6 +50,8 @@ export default function WatchStep({ song, clip, onChangeMatch, onNewTake }) {
           roomAvailable={roomAvailable}
           onSoundChange={setSound}
           onReferenceVideo={setHasReferenceVideo}
+          layout={layout}
+          onLayoutChange={onLayoutPick}
         />
       )}
       {error && <p className="error">{error}</p>}
@@ -55,19 +61,7 @@ export default function WatchStep({ song, clip, onChangeMatch, onNewTake }) {
       </p>
       {status === "ready" && (
         <div className="actions">
-          {hasReferenceVideo && (
-            <DownloadButton
-              url={videoUrl(sound, "side-by-side")}
-              label="Side by side"
-              onError={setError}
-            />
-          )}
-          <DownloadButton
-            primary
-            url={videoUrl(sound, "take")}
-            label={hasReferenceVideo ? "Your take" : "Download"}
-            onError={setError}
-          />
+          <DownloadButton primary url={videoUrl(sound, layout)} label="Download" onError={setError} />
         </div>
       )}
     </section>

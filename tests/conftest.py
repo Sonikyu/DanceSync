@@ -133,12 +133,13 @@ def write_flash_video(
     duration_sec: float,
     flash_sec: float,
     audio_path: Optional[Path] = None,
+    size: str = "64x64",
 ) -> None:
-    """A black 30 fps video that turns white at `flash_sec`. With
-    `audio_path`, that file becomes the soundtrack, like a phone filming a
-    laptop speaker."""
+    """A black 30 fps video, `size` pixels, that turns white at `flash_sec`.
+    With `audio_path`, that file becomes the soundtrack, like a phone filming
+    a laptop speaker."""
     video_source = (
-        f"color=c=black:s=64x64:r=30:d={duration_sec},"
+        f"color=c=black:s={size}:r=30:d={duration_sec},"
         f"drawbox=c=white:t=fill:enable='gte(t,{flash_sec})'"
     )
     cmd = ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", video_source]

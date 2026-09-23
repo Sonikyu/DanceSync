@@ -5,6 +5,7 @@ import {
   clipTooShortMessage,
   formatRate,
   formatTime,
+  layoutFor,
   leaderFor,
   nextOption,
   playbackRates,
@@ -196,5 +197,24 @@ describe("segmented control keys", () => {
 
   test("numbers work as values", () => {
     expect(nextOption([{ value: 0.5 }, { value: 0.75 }, { value: 1 }], 0.75, 1)).toBe(1);
+  });
+});
+
+describe("layout", () => {
+  test("defaults to side by side on a wide screen and stacked on a narrow one", () => {
+    expect(layoutFor({ picked: null, wideViewport: true, hasReferenceVideo: true })).toBe("side-by-side");
+    expect(layoutFor({ picked: null, wideViewport: false, hasReferenceVideo: true })).toBe("stacked");
+  });
+
+  test("the dancer's pick wins on any screen", () => {
+    expect(layoutFor({ picked: "take", wideViewport: true, hasReferenceVideo: true })).toBe("take");
+    expect(layoutFor({ picked: "side-by-side", wideViewport: false, hasReferenceVideo: true })).toBe("side-by-side");
+  });
+
+  test("an audio-only song only has the take, whatever was picked", () => {
+    for (const wideViewport of [true, false]) {
+      expect(layoutFor({ picked: null, wideViewport, hasReferenceVideo: false })).toBe("take");
+      expect(layoutFor({ picked: "stacked", wideViewport, hasReferenceVideo: false })).toBe("take");
+    }
   });
 });

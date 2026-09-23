@@ -128,28 +128,31 @@ button:focus-visible, a:focus-visible, .dropzone:focus-within { outline: 2px sol
 
 .caption { color: var(--text-muted); font-size: 14px; text-align: center; }
 
-/* Wider than the 480px column when there are two videos to fit side by side. */
+/* The layout class (side-by-side, stacked, take) is the one the dancer
+   picked, and matches what Download renders. Side by side gets wider than
+   the 480px column, to fit two videos. */
 .player { display: flex; flex-direction: column; gap: 12px; }
-.player.wide { align-self: center; width: min(960px, 100vw - 48px); }
+.player.side-by-side { align-self: center; width: min(960px, 100vw - 48px); }
 .compare { display: flex; flex-direction: column; gap: 8px; }
 .compare-video { display: block; width: 100%; min-width: 0; max-height: 60dvh; border-radius: var(--radius); background: #000; }
-.player.wide .compare-video.take { max-height: 45dvh; }
+.compare.stacked .compare-video.take { max-height: 45dvh; }
 
 /* Side by side, each video's width set by its aspect ratio so both end up
    the same height. */
-@media (min-width: 720px) {
-  .player.wide .compare { flex-direction: row; align-items: flex-start; }
-  .player.wide .compare-video { flex: var(--aspect, 1) 1 0; }
-  .player.wide .compare-video.take { max-height: 60dvh; }
-}
+.compare.side-by-side { flex-direction: row; align-items: flex-start; }
+.compare.side-by-side .compare-video { flex: var(--aspect, 1) 1 0; }
 
 .playbar { display: flex; align-items: center; gap: 12px; }
 .scrubber { flex: 1; min-width: 0; accent-color: var(--accent); }
 .playbar-time { color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 24px; }
-.control { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.control { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; }
 .segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--border); }
-.segmented button { height: 30px; padding: 0 16px; border: 0; border-radius: 7px; background: none; color: var(--text-muted); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.segmented button { height: 30px; padding: 0 16px; border: 0; border-radius: 7px; background: none; color: var(--text-muted); font: inherit; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; }
 .segmented button[aria-checked="true"] { background: var(--surface); color: var(--text); }
 .segmented button:disabled { color: var(--border-strong); cursor: default; }
+/* Room for Layout's three options on a phone. */
+@media (max-width: 420px) {
+  .segmented button { padding: 0 10px; }
+}

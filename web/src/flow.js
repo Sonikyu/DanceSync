@@ -92,6 +92,18 @@ export function outputTimeFor(clipSec, rate) {
   return clipSec * rate;
 }
 
+// Wide enough to show the reference and the take side by side by default.
+export const WIDE_VIEWPORT_QUERY = "(min-width: 720px)";
+
+// The layout to show and download ("side-by-side", "stacked" or "take"):
+// the dancer's pick if they made one, else side by side on a wide screen and
+// stacked on a narrow one. A song file with no picture only has the take.
+export function layoutFor({ picked, wideViewport, hasReferenceVideo }) {
+  if (!hasReferenceVideo) return "take";
+  if (picked) return picked;
+  return wideViewport ? "side-by-side" : "stacked";
+}
+
 // Review speeds, as fractions of the song's tempo.
 export const REVIEW_SPEEDS = [0.5, 0.75, 1];
 
