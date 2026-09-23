@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   chosenCandidate,
+  clipTooShortMessage,
   formatRate,
   formatTime,
   referenceTimeFor,
@@ -30,6 +31,20 @@ describe("step flow", () => {
 
   test("a clear match goes straight to watching", () => {
     expect(stepAfterAlignment(clipWith({ ambiguous: false }))).toBe("watch");
+  });
+
+  test("a failed match says so instead of asking which candidate", () => {
+    expect(stepAfterAlignment(clipWith({ failed: true, ambiguous: true }))).toBe("nomatch");
+    expect(stepAfterAlignment(clipWith({ failed: false }))).toBe("watch");
+  });
+
+  test("no match stands in for the watch stage", () => {
+    expect(stageOf("nomatch")).toBe(stageOf("watch"));
+  });
+
+  test("a too-short clip is told its length and the minimum", () => {
+    expect(clipTooShortMessage(5.96, 10)).toMatch(/^That video is 6 seconds long\. A take needs at least 10 seconds/);
+    expect(clipTooShortMessage(0.4, 10)).toMatch(/^That video is 1 second long\./);
   });
 
   test("the match step shares the video stage's dot", () => {

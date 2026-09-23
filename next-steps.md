@@ -87,8 +87,8 @@ Ticketed as three separate tracks — Ship (what's left before the MVP is done),
 
 - **Tests in CI (MVP):** done. `.github/workflows/test.yml` runs `pytest` and `npm --prefix web test` on every PR.
 - **Error cases (MVP):** friendly messages already exist for files that are too big, unsupported file types, and an unreachable server. Still needed:
-  - clips too short to match
-  - no strong peak anywhere, meaning the alignment failed outright rather than being ambiguous. The UI should hand off to manual placement ([manual-alignment](specs/manual-alignment.md)) instead of stopping at an error.
+  - ~~clips too short to match~~ (done: `MIN_CLIP_SEC` = 10 s, measured; the upload answers 422 with the clip's length)
+  - ~~no strong peak anywhere~~ (done: `MIN_MATCH_SCORE` = 3.5, measured; `AlignmentResult.failed` and a "couldn't find this take" screen with a "watch anyway" escape). Handing off to manual placement ([manual-alignment](specs/manual-alignment.md)) is DS-26.
   - ~~a startup check that stops the server if ffmpeg is missing~~ (done)
 - **One-command run (MVP):** done. A multi-stage `Dockerfile` (Node builds `web/dist`, Python 3.11 slim with ffmpeg runs it), FastAPI serving that build from the API's origin (`server/web.py`), and `docker compose up` with named volumes for data and cache. Settings come from `DANCESYNC_*` env vars (`.env.example`).
 - **Access control:** done. Set `DANCESYNC_PASSPHRASE` and every `/api` request needs the cookie from `POST /api/session`; the web app shows a sign-in screen. Unset means no sign-in, as before.

@@ -1,3 +1,5 @@
+import { clipTooShortMessage } from "./flow.js";
+
 // Fetch wrappers for the FastAPI backend. Paths are relative: in dev, Vite
 // proxies /api to the server, so the browser only ever talks to one origin.
 
@@ -96,5 +98,21 @@ function upload(url, file, onProgress) {
 
 function parseResponse(status, text) {
   if (status < 400) return JSON.parse(text);
-  throw new Error(MESSAGES[status] ?? "Something went wrong on the server. Try again.");
+  throw new Error(errorMessage(status, text));
+}
+
+// Most errors get a fixed message by status. A too-short clip gets one with
+// its own numbers, from the server's structured `detail`.
+function errorMessage(status, text) {
+  const detail = errorDetail(text);
+  if (detail?.error === "clip_too_short") return clipTooShortMessage(detail.duration_sec, detail.min_sec);
+  return MESSAGES[status] ?? "Something went wrong on the server. Try again.";
+}
+
+function errorDetail(text) {
+  try {
+    return JSON.parse(text).detail;
+  } catch {
+    return null;
+  }
 }

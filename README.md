@@ -171,6 +171,7 @@ DANCESYNC_API_URL=http://localhost:8001 npm --prefix web run dev
 |---|---|
 | "Can't reach the DanceSync server. Is it running?" | Terminal 1 isn't running, or it crashed. Check it and start it again. |
 | "Something went wrong on the server." | Check terminal 1 for a traceback. If it ends in `needs ffmpeg to decode`, run `brew install ffmpeg` and restart the API. |
+| "We couldn't find this take in the song" | The sound in the video didn't match the song well enough anywhere. Usually it's the wrong song, a practice speed other than full, ¾ or ½, or music too quiet under the room noise. "Watch the best guess anyway" shows what the matcher found. |
 | "Couldn't make that video." | The render failed, and terminal 1 only logs a `422` line. To see ffmpeg's actual error, open your browser's developer tools, go to the Network tab, find the failed `synced?…` request, and open its URL in a new tab. The usual causes are a missing ffmpeg or a corrupt file. |
 | `[Errno 48] Address already in use` | Something else is on port 8000, often an API server you left running. Find it with `lsof -i :8000`, or use another port (see above). |
 | `ModuleNotFoundError` when starting the API | Run the `pip install` line from step 2 again. Make sure the command starts with `.venv/bin/`. |

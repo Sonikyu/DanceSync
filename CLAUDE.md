@@ -72,7 +72,7 @@ docker compose up -d --build                          # production-style: one co
   1. `routes/clips.py` calls `storage.save`, which assigns a content-hash id.
   2. `worker.align_clip` decodes the audio with `audio.decode`.
   3. `matcher.precompute_ref_features` builds the stretched reference features, cached per reference id.
-  4. `matcher.match` produces the `AlignmentResult`: the top 3 candidates plus the `ambiguous` flag. It's saved in the catalog.
+  4. `matcher.match` produces the `AlignmentResult`: the top 3 candidates plus the `ambiguous` flag (`peak_ratio` < `AMBIGUOUS_PEAK_RATIO`) and the `failed` flag (winning score < `MIN_MATCH_SCORE`). It's saved in the catalog. Clips under `MIN_CLIP_SEC` are rejected with 422 before matching.
 - **Render** (runs on `HEAD`/`GET /api/clips/{id}/synced`):
   1. `routes/synced.py` picks the chosen candidate, or the best one if the user never picked.
   2. `worker.sync_clip` calls `sync.render_synced` or `sync.render_side_by_side`.
@@ -99,6 +99,7 @@ docker compose up -d --build                          # production-style: one co
 - **iOS Safari won't fetch a `<video>` source until play is pressed.** So the UI sends a `HEAD` to `/synced` to trigger the render before handing the URL to the player. iOS also lets an element play unmuted only if a user gesture started it.
 - **Two `<video>` elements never stay in lockstep on their own.** One is the clock, and the other is steered: small `playbackRate` nudges, with a seek only past 0.5 s of drift. Seeking on every drift stalls on keyframe decodes.
 - **Re-timed takes have unusual frame rates.** A 30 fps clip at 0.75x becomes 40 fps. `-fps_mode passthrough` and `-enc_time_base:v filter` keep every frame, because resampling to 30 visibly stutters. The side-by-side render puts both inputs on a 60 fps grid before `hstack`.
+- **Synthetic songs all share one eight-chord vocabulary,** so two different `make_reference` seeds score 5–7 against each other, well above `MIN_MATCH_SCORE`. A synthetic "wrong song" needs to be transposed out of those chords (see `test_ambiguity.py`); real songs don't have this problem.
 - **`peak_ratio` can be infinite** when nothing competes with the winner. The API sends it as `null`.
 - **With `DANCESYNC_PASSPHRASE` set, every `/api` call needs the session cookie.** `<video>`/`<audio>` send it on range requests because everything is same-origin; a cross-origin frontend would need credentialed CORS.
 - **The full pytest run takes about a minute,** because the sync tests render real video. librosa's "empty frequency set" warnings on synthetic audio are expected.

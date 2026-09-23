@@ -3,16 +3,28 @@
 
 // The header dots show three stages. Checking an ambiguous match counts as
 // part of the video stage, so the dots never skip ahead when it's not needed.
+// "No match" stands in for the player, so it's the watch stage.
 export const STAGES = ["Song", "Video", "Watch"];
 
-const STAGE_OF_STEP = { song: 0, video: 1, match: 1, watch: 2 };
+const STAGE_OF_STEP = { song: 0, video: 1, match: 1, watch: 2, nomatch: 2 };
 
 export function stageOf(step) {
   return STAGE_OF_STEP[step];
 }
 
+// A failed match skips the candidate picker: none of the candidates is good.
 export function stepAfterAlignment(clip) {
+  if (clip.alignment.failed) return "nomatch";
   return clip.alignment.ambiguous ? "match" : "watch";
+}
+
+// "That video is 6 seconds long. A take needs at least 10 seconds…"
+export function clipTooShortMessage(durationSec, minSec) {
+  const seconds = Math.max(1, Math.round(durationSec));
+  return (
+    `That video is ${seconds} second${seconds === 1 ? "" : "s"} long. ` +
+    `A take needs at least ${minSec} seconds of dancing to the song, so it can be matched.`
+  );
 }
 
 // The user's pick if they made one, else the matcher's best guess -- the same

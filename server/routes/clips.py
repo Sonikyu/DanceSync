@@ -9,14 +9,14 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from dancesync.audio import is_supported
-from dancesync.config import AMBIGUOUS_PEAK_RATIO
+from dancesync.config import AMBIGUOUS_PEAK_RATIO, MIN_CLIP_SEC, MIN_MATCH_SCORE
 from dancesync.types import Candidate as MatchCandidate
 from server.catalog import Catalog
 from server.config import MAX_CLIP_BYTES
 from server.deps import get_catalog, get_storage
 from server.models import AlignmentResult, Candidate, Clip
 from server.storage import LocalStorage, StorageError
-from server.worker import align_clip
+from server.worker import ClipTooShortError, align_clip
 
 router = APIRouter(prefix="/api/clips", tags=["clips"])
 
@@ -41,7 +41,11 @@ async def upload_clip(
 
     reference_suffix = Path(reference.filename).suffix.lower()
     reference_path = storage.path_for("references", reference.id, reference_suffix)
-    match = align_clip(clip_path, reference_path, reference.id)
+    try:
+        match = align_clip(clip_path, reference_path, reference.id)
+    except ClipTooShortError as exc:
+        clip_path.unlink(missing_ok=True)
+        raise HTTPException(422, _too_short_detail(exc.duration_sec)) from exc
 
     clip = Clip(
         id=clip_id,
@@ -50,6 +54,7 @@ async def upload_clip(
         alignment=AlignmentResult(
             top_candidates=[_candidate_model(c) for c in match.top_candidates],
             ambiguous=match.peak_ratio < AMBIGUOUS_PEAK_RATIO,
+            failed=match.score < MIN_MATCH_SCORE,
         ),
         created_at=datetime.now(timezone.utc),
     )
@@ -63,6 +68,11 @@ async def get_clip(clip_id: str, catalog: Catalog = Depends(get_catalog)) -> Cli
     if clip is None:
         raise HTTPException(404, f"no clip with id {clip_id}")
     return clip
+
+
+def _too_short_detail(duration_sec: float) -> dict:
+    """Structured, so the UI can word it for dancers with both numbers."""
+    return {"error": "clip_too_short", "duration_sec": duration_sec, "min_sec": MIN_CLIP_SEC}
 
 
 def _candidate_model(candidate: MatchCandidate) -> Candidate:

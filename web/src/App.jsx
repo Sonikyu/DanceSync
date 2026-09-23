@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getSession } from "./api.js";
 import { stageOf, stepAfterAlignment } from "./flow.js";
 import MatchStep from "./components/MatchStep.jsx";
+import NoMatchStep from "./components/NoMatchStep.jsx";
 import SignInStep from "./components/SignInStep.jsx";
 import SongStep from "./components/SongStep.jsx";
 import StepDots from "./components/StepDots.jsx";
@@ -9,6 +10,7 @@ import VideoStep from "./components/VideoStep.jsx";
 import WatchStep from "./components/WatchStep.jsx";
 
 // One screen at a time: song -> video -> match (only when ambiguous) -> watch.
+// A failed match shows "no match" in place of watch.
 // Sign-in comes first, only when the server has a passphrase set.
 export default function App() {
   const [signedIn, setSignedIn] = useState(null);   // null = still asking the server
@@ -49,6 +51,14 @@ export default function App() {
       )}
       {step === "match" && (
         <MatchStep song={song} clip={clip} onBack={() => setStep("video")} onPicked={finishMatch} />
+      )}
+      {step === "nomatch" && (
+        <NoMatchStep
+          song={song}
+          onNewTake={() => setStep("video")}
+          onNewSong={() => setStep("song")}
+          onWatchAnyway={() => setStep("watch")}
+        />
       )}
       {step === "watch" && (
         <WatchStep

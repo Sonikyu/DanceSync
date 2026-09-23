@@ -32,12 +32,15 @@ class Reference(BaseModel):
 
 
 class AlignmentResult(BaseModel):
-    """`ambiguous` is decided once, at upload, against the matcher's
-    `AMBIGUOUS_PEAK_RATIO`. The UI asks the user to pick a candidate only
-    when it is set."""
+    """`ambiguous` and `failed` are decided once, at upload, against the
+    matcher's `AMBIGUOUS_PEAK_RATIO` and `MIN_MATCH_SCORE`. The UI asks the
+    user to pick a candidate when `ambiguous` is set, and says the take
+    wasn't found in the song when `failed` is. Records saved before `failed`
+    existed load as not failed."""
 
     top_candidates: list[Candidate]
     ambiguous: bool
+    failed: bool = False
     selected_index: int | None = None
 
 
