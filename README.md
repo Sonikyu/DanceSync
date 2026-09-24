@@ -9,8 +9,8 @@ A dancer plays a song at reduced speed (say 0.75×) on a laptop and films themse
 ## How it works
 
 1. **Match** (`dancesync/matcher.py`): the phone's audio is compared against the reference at each candidate playback rate, using chroma features. When a repeated chorus makes the answer ambiguous, the user picks from the top three candidates.
-2. **Re-time** (`dancesync/sync.py`): one ffmpeg command speeds the video up by `1/rate` and lays the reference audio underneath, starting from the matched point.
-3. **Review** (`web/`): the synced take plays next to the reference video, with either the song or the room sound.
+2. **Review** (`web/`): the browser plays the uploaded video sped up by `1/rate`, next to the reference video and in time with the song, so it's ready the moment the match is. The two are kept in step by nudging the silent one's playback speed.
+3. **Render on download** (`dancesync/sync.py`): one ffmpeg command speeds the video up by `1/rate` and lays the reference audio underneath, starting from the matched point, with the same timing the browser uses.
 
 ---
 
@@ -87,7 +87,7 @@ Leave both terminals open while you use the app. Errors from the server show up 
 1. **Choose your song:** upload the original track. An audio file works; a video of the choreography is better, because then you can watch your take beside it or under it.
 2. **Add your practice video:** the phone recording. Finding your place in the song takes 10–30 seconds, and the first take against a new song takes longer.
 3. **Which part did you dance?** You only see this screen if the song has repeated sections that sound alike. Play each candidate and pick yours.
-4. **Watch:** the synced take plays next to the reference. Switch between the song and the room sound, slow it down, pick a layout, or download the video. If it's slightly out of sync, open **Fine-tune**: nudge the offset (or the practice speed, if it drifts), and pick **Both** under Sound to hear the song and the room together; they sound like one when they line up.
+4. **Watch:** the synced take plays next to the reference, straight away. Switch between the song and the room sound, slow it down, pick a layout, or download the video (the download is made when you ask for it, and takes about as long as the clip). If it's slightly out of sync, open **Fine-tune**: nudge the offset (or the practice speed, if it drifts), and pick **Both** under Sound to hear the song and the room together; they sound like one when they line up.
 
 If DanceSync can't find your take in the song at all, you can place it by hand: drag to roughly where it starts, then fine-tune by ear.
 
@@ -174,6 +174,7 @@ DANCESYNC_API_URL=http://localhost:8001 npm --prefix web run dev
 | "Can't reach the DanceSync server. Is it running?" | Terminal 1 isn't running, or it crashed. Check it and start it again. |
 | "Something went wrong on the server." | Check terminal 1 for a traceback. If it ends in `needs ffmpeg to decode`, run `brew install ffmpeg` and restart the API. |
 | "We couldn't find this take in the song" | The sound in the video didn't match the song well enough anywhere. Usually it's the wrong song, a practice speed other than full, ¾ or ½, or music too quiet under the room noise. "Watch the best guess anyway" shows what the matcher found. |
+| "Preparing your video…" before Watch plays | Your browser can't play the phone's original file, usually HEVC (the iPhone default) in Firefox or in Chrome on Linux or older Windows, so the server converts it first. It works, just slower. To skip it, use Safari or Chrome on a Mac, or set the iPhone to Settings → Camera → Formats → Most Compatible. |
 | "Couldn't make that video." | The render failed, and terminal 1 only logs a `422` line. To see ffmpeg's actual error, open your browser's developer tools, go to the Network tab, find the failed `synced?…` request, and open its URL in a new tab. The usual causes are a missing ffmpeg or a corrupt file. |
 | `[Errno 48] Address already in use` | Something else is on port 8000, often an API server you left running. Find it with `lsof -i :8000`, or use another port (see above). |
 | `ModuleNotFoundError` when starting the API | Run the `pip install` line from step 2 again. Make sure the command starts with `.venv/bin/`. |
@@ -185,7 +186,7 @@ DANCESYNC_API_URL=http://localhost:8001 npm --prefix web run dev
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest     # about a minute, because it renders real video
+.venv/bin/python -m pytest     # a few minutes, because it renders real video
 npm --prefix web test
 ```
 
@@ -196,7 +197,9 @@ dancesync/   matcher + sync engine (Python library, no web code)
 server/      FastAPI app: upload, align, select, render
 web/         React + Vite frontend
 tests/       pytest: Tier A matcher regression, API, renders
+docs/        hosting runbook
 specs/       specs for post-MVP features
+tickets/     each spec broken into day-sized tickets, and the working order
 spike/       the original alignment experiment (reference only, not imported)
 ```
 

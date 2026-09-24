@@ -67,6 +67,11 @@ export function clearManualAlignment(clipId) {
   return request(`/api/clips/${clipId}/manual`, { method: "DELETE" });
 }
 
+// The take exactly as it was uploaded, for playing on Watch without a render.
+export function clipMediaUrl(clipId) {
+  return `/api/clips/${clipId}/media`;
+}
+
 // The song file itself: audio for previews, video for the side-by-side view.
 export function referenceMediaUrl(referenceId) {
   return `/api/references/${referenceId}/media`;

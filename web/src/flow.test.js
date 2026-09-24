@@ -179,6 +179,11 @@ describe("clip and output time", () => {
     expect(at(102)).toBe("take");        // the take outlasts the song
   });
 
+  test("the raw clip, never re-timed, runs at the alignment's rate", () => {
+    expect(takeRateFor(0.75, 1)).toBe(0.75);
+    expect(playbackRates({ rate: takeRateFor(0.75, 1), speed: 1 }).take).toBeCloseTo(4 / 3, 12);
+  });
+
   test("a render re-timed to a tuned rate runs at their ratio", () => {
     expect(takeRateFor(0.75, 0.75)).toBe(1);
     expect(takeRateFor(0.8, 0.75)).toBeCloseTo(16 / 15, 12);

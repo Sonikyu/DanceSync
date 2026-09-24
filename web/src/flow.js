@@ -124,9 +124,11 @@ export function playbackRates({ rate, speed }) {
 }
 
 // The take media's own speed relative to the song -- the `rate` for the
-// timing helpers above -- when a render made at `renderedRate` plays an
-// alignment at `rate`. A render already runs at full tempo, so re-timing it
-// live to a tuned rate is the ratio of the two: 1 when nothing was tuned.
+// timing helpers above -- when media re-timed at `renderedRate` plays an
+// alignment at `rate`. The raw clip, as filmed, was never re-timed: its
+// renderedRate is 1 and its take rate is the alignment's rate. A render
+// already runs at full tempo, so re-timing it live to a tuned rate is the
+// ratio of the two: 1 when nothing was tuned.
 export function takeRateFor(rate, renderedRate) {
   return rate / renderedRate;
 }
