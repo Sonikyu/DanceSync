@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 DanceSync is a dance practice tool. Dancers record themselves practicing to slowed-down music, typically at 0.75x on a laptop speaker, filmed on a phone. The app syncs the video to the original-speed reference track, so dancers can review their practice at full tempo, in time with the music and next to the original choreography.
 
-**Status:** The MVP is built. That covers the production matcher (`dancesync/`), the FastAPI backend (`server/`), the ffmpeg sync engine, and the React web UI (`web/`). What remains is Phase 5 polish and the post-MVP features. Both are tracked in `next-steps.md`, and each feature has its own spec in `specs/`. The spike in `spike/` validated the alignment premise on both synthetic (Tier A) and real-world (Tier B) recordings.
+**Status:** The MVP is built. That covers the production matcher (`dancesync/`), the FastAPI backend (`server/`), the ffmpeg sync engine, and the React web UI (`web/`). Phase 5's MVP items (CI, error cases, Docker, access control) and post-MVP features 1–4 (instant preview, review speed, manual alignment, layouts) are done too. What remains is tracked in `next-steps.md`; each feature has its own spec in `specs/`, broken into tickets in `tickets/`. The spike in `spike/` validated the alignment premise on both synthetic (Tier A) and real-world (Tier B) recordings.
 
 **Audience:** The owner and friends. It runs locally or self-hosted; it is not a public site.
 
@@ -35,7 +35,7 @@ DanceSync/
 │   └── config.py             # storage root, upload limits, CORS origins, web dist (DANCESYNC_* env overrides)
 ├── web/                      # React 19 + Vite SPA
 │   └── src/
-│       ├── App.jsx           # step machine: song → video → match (only if ambiguous) → watch
+│       ├── App.jsx           # step machine: song → video → match (only if ambiguous) → watch; no match → place by hand → watch
 │       ├── flow.js           # pure helpers (timing, formatting), unit-tested with Vitest
 │       ├── tuning.js         # pure helpers for fine-tuning and placing a take by hand, unit-tested with Vitest
 │       ├── api.js            # fetch/XHR wrappers + dancer-facing error messages
@@ -43,6 +43,7 @@ DanceSync/
 ├── tests/                    # pytest: Tier A matcher regression, ambiguity, API, real renders
 ├── docs/hosting.md           # runbook: VPS + Docker + Caddy, timeouts, backups, updates
 ├── specs/                    # one spec per post-MVP feature
+├── tickets/                  # each spec as day-sized tickets; README.md holds the working order and status
 ├── spike/                    # alignment spike (validated; reference only, never imported)
 ├── next-steps.md             # status + roadmap
 ├── TODO.md                   # ideas inbox; specced ideas link into specs/
@@ -59,7 +60,7 @@ npm --prefix web install
 .venv/bin/uvicorn server.main:app --port 8000         # API
 npm --prefix web run dev                              # UI on :5173, proxies /api to :8000 (override: DANCESYNC_API_URL)
 
-.venv/bin/python -m pytest                            # full suite, ~1 min (renders real video)
+.venv/bin/python -m pytest                            # full suite, a few minutes (renders real video)
 .venv/bin/python -m pytest tests/test_matcher.py      # Tier A regression only
 npm --prefix web test                                 # Vitest
 
@@ -75,12 +76,12 @@ docker compose up -d --build                          # production-style: one co
   2. `worker.align_clip` decodes the audio with `audio.decode`.
   3. `matcher.precompute_ref_features` builds the stretched reference features, cached per reference id.
   4. `matcher.match` produces the `AlignmentResult`: the top 3 candidates plus the `ambiguous` flag (`peak_ratio` < `AMBIGUOUS_PEAK_RATIO`) and the `failed` flag (winning score < `MIN_MATCH_SCORE`). It's saved in the catalog. Clips under `MIN_CLIP_SEC` are rejected with 422 before matching.
-- **Render** (runs on `HEAD`/`GET /api/clips/{id}/synced`):
+- **Render** (runs on `HEAD`/`GET /api/clips/{id}/synced`: a Download, or the fallback when the browser can't play the raw clip):
   1. `routes/synced.py` takes the clip's effective alignment (`models.effective_alignment`): the manual alignment if the dancer set one on Watch, else the chosen candidate, else the best one. `flow.effectiveAlignment` is the browser's copy of that rule.
   2. The route builds a `RenderParams` from that alignment plus `sound`/`layout`, and `worker.sync_clip` calls `sync.render_synced` (layout `take`) or `sync.render_compare` (`side-by-side`, `stacked`) with it.
   3. `ffmpeg.run_to_file` writes the output. Its filename encodes every input, so an existing file is served as-is.
   4. `render_cache.touch` marks it used; after a new render, `render_cache.sweep` deletes the least recently used renders past `RENDER_CACHE_MAX_BYTES`.
-- **Watch** (in the browser): `ComparePlayer` plays one render of the take under its room sound (made at the alignment Watch opened with) and the song media, on one play bar. The song plays from the song media, the room from the take, so the Sound control only flips which one is muted. `useLinkedPlayback` makes the element making the sound the clock (`flow.leaderAt`: the song while it's playing, else the take) and nudges the muted one's `playbackRate` to follow. A tuned offset or rate applies live: `flow.takeRateFor` re-times the render, and the song jumps to the new offset. Only Download renders anything else. The fine-tune panel (`FineTune`) edits a draft alignment that plays at once, offers a "Both" sound while open, and saves it with `PUT /manual` on Done; Download is hidden until then, so it always renders saved values. A failed match leads to `PlaceStep`, which writes a rough manual alignment and opens Watch with the panel open. Review speed (0.5×/0.75×/1×) sets both base rates through `flow.playbackRates`, and the nudge is around that base; downloads are unaffected. The layout (side by side, stacked, take only; `flow.layoutFor`) is a class on `.compare`, and the one Download button renders that layout and sound.
+- **Watch** (in the browser): `ComparePlayer` plays the uploaded take itself (`GET /api/clips/{id}/media`) and the song media on one play bar, so Watch is ready the moment alignment is. If the browser can't decode the take (an `error`, or metadata with no picture), `WatchStep` falls back to a render of it under its room sound. The song plays from the song media, the room from the take, so the Sound control only flips which one is muted. `useLinkedPlayback` makes the element making the sound the clock (`flow.leaderAt`: the song while it's playing, else the take) and nudges the muted one's `playbackRate` to follow. The take plays at `flow.takeRateFor(rate, renderedRate)` relative to the song: the alignment's rate for the raw clip, the ratio of the two for a render. A tuned offset or rate applies live, and the song jumps to the new offset. Only Download, and that fallback, render anything. The fine-tune panel (`FineTune`) edits a draft alignment that plays at once, offers a "Both" sound while open, and saves it with `PUT /manual` on Done; Download is hidden until then, so it always renders saved values. A failed match leads to `PlaceStep`, which writes a rough manual alignment and opens Watch with the panel open. Review speed (0.5×/0.75×/1×) sets both base rates through `flow.playbackRates`, and the nudge is around that base; downloads are unaffected. The layout (side by side, stacked, take only; `flow.layoutFor`) is a class on `.compare`, and the one Download button renders that layout and sound.
 
 `dancesync/` never imports from `server/`, and `server/` reaches the matcher and renderer only through `worker.py`.
 
@@ -99,13 +100,15 @@ docker compose up -d --build                          # production-style: one co
 - **Self-similar audio produces tied peaks that look like bugs.** Before chasing a matcher bug, check whether the material is repetitive; `peak_ratio` will tell you.
 - **Overlap normalization needs its floor.** Without `MIN_OVERLAP_FRAC`, a two-frame edge alignment wins everything.
 - **Tier A failures are code bugs, not findings.** If the synthetic gate fails after a matcher change, the change broke something. Don't debug it with real recordings.
-- **iOS Safari won't fetch a `<video>` source until play is pressed.** So the UI sends a `HEAD` to `/synced` to trigger the render before handing the URL to the player. iOS also lets an element play unmuted only if a user gesture started it.
+- **iOS Safari won't fetch a `<video>` source until play is pressed.** So before handing a render's URL to a player or a download, the UI sends a `HEAD` to `/synced` to make the server render it. iOS also lets an element play unmuted only if a user gesture started it, so Play starts both elements inside the click, even a song that isn't due yet (it's paused again at once).
+- **An undecodable video doesn't always fire `error`.** Chrome without HEVC plays an HEVC take's audio with no picture: `videoWidth` is 0 at `loadedmetadata`. `ComparePlayer` treats that as unplayable too, and `WatchStep` falls back to a render.
 - **Two `<video>` elements never stay in lockstep on their own.** One is the clock, and the other is steered: small `playbackRate` nudges, with a seek only past 0.5 s of drift. Seeking on every drift stalls on keyframe decodes. Leadership changes (the song starts after a lead-in, the sound switches), so every update also puts the leader back at its base rate; a leader that keeps a nudge from its follower days drags both elements off tempo.
 - **Re-timed takes have unusual frame rates.** A 30 fps clip at 0.75x becomes 40 fps. `-fps_mode passthrough` and `-enc_time_base:v filter` keep every frame, because resampling to 30 visibly stutters. The compare renders put both inputs on a 60 fps grid before `hstack`/`vstack`.
 - **Synthetic songs all share one eight-chord vocabulary,** so two different `make_reference` seeds score 5–7 against each other, well above `MIN_MATCH_SCORE`. A synthetic "wrong song" needs to be transposed out of those chords (see `test_ambiguity.py`); real songs don't have this problem.
 - **`peak_ratio` can be infinite** when nothing competes with the winner. The API sends it as `null`.
 - **With `DANCESYNC_PASSPHRASE` set, every `/api` call needs the session cookie.** `<video>`/`<audio>` send it on range requests because everything is same-origin; a cross-origin frontend would need credentialed CORS.
-- **The full pytest run takes about a minute,** because the sync tests render real video. librosa's "empty frequency set" warnings on synthetic audio are expected.
+- **Playwright's bundled Chromium can't decode H.264 or AAC,** so it can't play the app's MP4 renders or a phone's upload. To test playback in it, serve VP9/Opus WebM transcodes of the same media with `page.route`, including byte ranges (without them nothing can seek). As a side effect, a raw MP4 take exercises the render fallback for real.
+- **The full pytest run takes a few minutes,** because the sync tests render real video. librosa's "empty frequency set" warnings on synthetic audio are expected.
 
 ## Coding style
 
@@ -121,14 +124,14 @@ The owner of this repo reviews and debugs every line. Write code they can read i
 - **Explicit over implicit.** No `**kwargs` passthrough unless you're wrapping an external API. No `setattr` magic. If a function takes 5 parameters, write out 5 parameters.
 - **Docstrings only where the signature isn't enough.** `decode_to_mono(path: Path, sr: int) -> np.ndarray` doesn't need one. A function whose units or coordinate system aren't obvious does.
 - **Type hints on public interfaces.** Module-level functions and dataclass fields get type hints. Local variables don't need them.
-- **Frontend:** function components and hooks, plain CSS in `styles.css`, no state library, no UI kit, and only `react`/`react-dom` at runtime. Put any logic that can be pure in `flow.js` with a Vitest test, and keep components thin.
+- **Frontend:** function components and hooks, plain CSS in `styles.css`, no state library, no UI kit, and only `react`/`react-dom` at runtime. Put any logic that can be pure in `flow.js` (or `tuning.js`, for fine-tuning and placing a take) with a Vitest test, and keep components thin.
 
 ## Development conventions
 
 - **Python 3.11+**, with dependencies in `pyproject.toml` (the spike keeps its own `requirements.txt`). **Node 20.19+ or 22.12+** for Vite.
 - **ffmpeg** is a runtime dependency, required for all audio/video decoding and rendering.
 - **No code from `spike/` is imported into production.** Use the spike as a reference for behavior and edge cases.
-- **Tests are mandatory for production code.** Python code needs pytest, with the Tier A cases as the minimum regression suite. Frontend helpers in `flow.js` need Vitest tests.
+- **Tests are mandatory for production code.** Python code needs pytest, with the Tier A cases as the minimum regression suite. Frontend helpers in `flow.js` and `tuning.js` need Vitest tests.
 - **All media files are gitignored:** `.data/server/` (uploads, catalog, renders), `.cache/dancesync/` (decoded audio, stretched features), and `spike/data/`.
 
 ## GitHub Actions

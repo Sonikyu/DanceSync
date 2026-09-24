@@ -13,9 +13,10 @@ import useLinkedPlayback from "./useLinkedPlayback.js";
 // audio-only there's no picture to show, so the reference stays hidden (still
 // playing the song), and there's no layout to pick.
 //
-// `takeRate` re-times the take live (flow.takeRateFor), so a tuned rate or
-// offset plays at once without a new render. While `tuning`, Sound also
-// offers Both.
+// The take is the raw clip, or a render of it where the browser can't play
+// the raw clip (`onTakeUnplayable`). `takeRate` re-times it live
+// (flow.takeRateFor), so a tuned rate or offset plays at once without a new
+// render. While `tuning`, Sound also offers Both.
 //
 // Speed slows both down together for reviewing a fast passage. It starts at
 // 1× for every take and isn't saved.
@@ -30,6 +31,7 @@ export default function ComparePlayer({
   tuning,
   onSoundChange,
   onReferenceVideo,
+  onTakeUnplayable,
   layout,
   onLayoutChange,
 }) {
@@ -41,8 +43,15 @@ export default function ComparePlayer({
   const [speed, setSpeed] = useState(1);
   const linked = useLinkedPlayback(takeRef, referenceRef, { offsetSec, takeRate, speed, sound });
 
+  // A browser that can't decode the picture may still play the sound, with
+  // no picture and no error (Chrome with an HEVC clip), so that counts as
+  // unplayable too.
   function takeLoaded() {
     const take = takeRef.current;
+    if (take.videoWidth === 0) {
+      onTakeUnplayable();
+      return;
+    }
     setTakeMediaSec(take.duration);
     setTakeAspect(take.videoWidth / take.videoHeight);
   }
@@ -80,6 +89,7 @@ export default function ComparePlayer({
           onLoadedMetadata={takeLoaded}
           onTimeUpdate={linked.onTimeUpdate}
           onEnded={linked.pause}
+          onError={onTakeUnplayable}
         />
       </div>
       <PlayBar

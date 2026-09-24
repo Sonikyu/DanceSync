@@ -23,6 +23,8 @@ Ids are stable and never reused. They are grouped by track, and the number does 
 
 ## Recommended order
 
+Steps 1–5 are done (see the Status column in the index below). Next up is step 6, by what you need.
+
 **1 · Foundations** — [DS-01](DS-01-ci-test-workflow.md), [DS-02](DS-02-ffmpeg-startup-check.md), [DS-03](DS-03-render-params-record.md).
 DS-01 first, literally: every ticket after it relies on CI being real. DS-03 before any feature that changes a render, which is five of the eight.
 
@@ -42,55 +44,55 @@ The safety net: it fixes a slightly-off match, covers speeds the matcher doesn't
 
 ## Index
 
-| Id | Ticket | Track | Size | Depends on |
-|---|---|---|---|---|
-| [DS-01](DS-01-ci-test-workflow.md) | Run the test suites in CI | Foundations | S | — |
-| [DS-02](DS-02-ffmpeg-startup-check.md) | Fail fast when ffmpeg is missing | Foundations | XS | — |
-| [DS-03](DS-03-render-params-record.md) | One render-params record | Foundations | S | — |
-| [DS-04](DS-04-clip-too-short.md) | Reject clips too short to match | Ship | S | — |
-| [DS-05](DS-05-alignment-failed.md) | Report an outright alignment failure | Ship | S | — |
-| [DS-06](DS-06-dockerfile.md) | Dockerfile with ffmpeg | Ship | S | — |
-| [DS-07](DS-07-serve-web-dist.md) | FastAPI serves the built frontend | Ship | S | — |
-| [DS-08](DS-08-docker-compose.md) | `docker compose up` | Ship | XS | 06, 07 |
-| [DS-09](DS-09-access-control.md) | Shared-passphrase access control | Ship | S | 07 |
-| [DS-10](DS-10-render-cache-cleanup.md) | Cap the render cache | Operate | S | — |
-| [DS-11](DS-11-benchmark-harness.md) | Real-clip benchmark harness | Operate | M | 01 |
-| [DS-12](DS-12-hosting-runbook.md) | Hosting runbook | Operate | S | 08, 09 |
-| [DS-13](DS-13-job-queue.md) | Job queue for align and render | Platform | M–L | — |
-| [DS-14](DS-14-progress-events.md) | Progress over SSE | Platform | M | 13 |
-| [DS-15](DS-15-clip-media-endpoint.md) | Serve the uploaded clip bytes | Instant preview | S | — |
-| [DS-16](DS-16-clip-time-mapping.md) | Clip↔output time mapping | Instant preview | S | — |
-| [DS-17](DS-17-leader-follower-by-sound.md) | Leader and follower by sound | Instant preview | M | 16 |
-| [DS-18](DS-18-play-raw-clip.md) | Play the raw clip | Instant preview | M | 15, 16, 17 |
-| [DS-19](DS-19-playback-fallback.md) | Fall back to the server render | Instant preview | S–M | 18 |
-| [DS-20](DS-20-segmented-control.md) | Shared `Segmented` control | Review speed | XS | — |
-| [DS-21](DS-21-review-speed-control.md) | Review at 0.5× / 0.75× / 1× | Review speed | S | 18, 20 |
-| [DS-22](DS-22-manual-alignment-api.md) | Manual alignment model + endpoints | Manual alignment | S | — |
-| [DS-23](DS-23-effective-alignment.md) | Use the effective alignment | Manual alignment | S | 03, 22 |
-| [DS-24](DS-24-fine-tune-ui.md) | Fine-tune panel | Manual alignment | M | 23 |
-| [DS-25](DS-25-both-sound.md) | "Both" sound for tuning by ear | Manual alignment | XS | 17, 24 |
-| [DS-26](DS-26-manual-placement-fallback.md) | Manual placement on failure | Manual alignment | S | 05, 24 |
-| [DS-27](DS-27-compare-command.md) | One compare command | Layouts | S | — |
-| [DS-28](DS-28-layout-api.md) | `stacked` through the API | Layouts | XS | 03, 27 |
-| [DS-29](DS-29-layout-picker.md) | Pick a layout on Watch | Layouts | S | 20, 28 |
-| [DS-30](DS-30-youtube-url-validation.md) | URL allowlist + metadata probe | YouTube | S | — |
-| [DS-31](DS-31-youtube-import-route.md) | Download an import | YouTube | M | 30 |
-| [DS-32](DS-32-youtube-ui.md) | Paste a link on the Song step | YouTube | XS | 31 |
-| [DS-33](DS-33-edit-models-api.md) | Framing and trim model + endpoints | Editing | S | — |
-| [DS-34](DS-34-framing-filters.md) | `framing.py` filter builders | Editing | S | 33 |
-| [DS-35](DS-35-trimmed-offset.md) | `trimmed_offset` | Editing | S | 33 |
-| [DS-36](DS-36-render-with-edits.md) | Renders apply the edits | Editing | M | 03, 34, 35 |
-| [DS-37](DS-37-framing-preview.md) | Live edit preview | Editing | S | 18, 33 |
-| [DS-38](DS-38-adjust-ui.md) | Adjust: crop, mirror, rotate | Editing | M | 37 |
-| [DS-39](DS-39-trim-ui.md) | Trim the take | Editing | S | 35, 38 |
-| [DS-40](DS-40-coarse-rate-grid.md) | Coarse rate grid + dedupe | Practice speeds | M | — |
-| [DS-41](DS-41-incremental-feature-cache.md) | Cache only missing rates | Practice speeds | S | 40 |
-| [DS-42](DS-42-rate-refinement.md) | Measure the rate from drift | Practice speeds | M | 40 |
-| [DS-43](DS-43-precompute-on-upload.md) | Stretch on song upload | Practice speeds | S | 13, 41 |
-| [DS-44](DS-44-offgrid-rate-tests.md) | Off-grid coverage + display | Practice speeds | S | 42 |
-| [DS-45](DS-45-stretch-clip-experiment.md) | Experiment: stretch the clip | Practice speeds | S | 40 |
-| [DS-46](DS-46-follow-dancer-spike.md) | Spike: follow one dancer | Follow dancer | L | 13 |
-| [DS-47](DS-47-keyframed-crop.md) | Fallback: keyframed crop | Follow dancer | M | 36, 46 fails |
+| Id | Ticket | Track | Size | Depends on | Status |
+|---|---|---|---|---|---|
+| [DS-01](DS-01-ci-test-workflow.md) | Run the test suites in CI | Foundations | S | — | Done |
+| [DS-02](DS-02-ffmpeg-startup-check.md) | Fail fast when ffmpeg is missing | Foundations | XS | — | Done |
+| [DS-03](DS-03-render-params-record.md) | One render-params record | Foundations | S | — | Done |
+| [DS-04](DS-04-clip-too-short.md) | Reject clips too short to match | Ship | S | — | Done |
+| [DS-05](DS-05-alignment-failed.md) | Report an outright alignment failure | Ship | S | — | Done |
+| [DS-06](DS-06-dockerfile.md) | Dockerfile with ffmpeg | Ship | S | — | Done |
+| [DS-07](DS-07-serve-web-dist.md) | FastAPI serves the built frontend | Ship | S | — | Done |
+| [DS-08](DS-08-docker-compose.md) | `docker compose up` | Ship | XS | 06, 07 | Done |
+| [DS-09](DS-09-access-control.md) | Shared-passphrase access control | Ship | S | 07 | Done |
+| [DS-10](DS-10-render-cache-cleanup.md) | Cap the render cache | Operate | S | — | Done |
+| [DS-11](DS-11-benchmark-harness.md) | Real-clip benchmark harness | Operate | M | 01 | |
+| [DS-12](DS-12-hosting-runbook.md) | Hosting runbook | Operate | S | 08, 09 | Done |
+| [DS-13](DS-13-job-queue.md) | Job queue for align and render | Platform | M–L | — | |
+| [DS-14](DS-14-progress-events.md) | Progress over SSE | Platform | M | 13 | |
+| [DS-15](DS-15-clip-media-endpoint.md) | Serve the uploaded clip bytes | Instant preview | S | — | Done |
+| [DS-16](DS-16-clip-time-mapping.md) | Clip↔output time mapping | Instant preview | S | — | Done |
+| [DS-17](DS-17-leader-follower-by-sound.md) | Leader and follower by sound | Instant preview | M | 16 | Done |
+| [DS-18](DS-18-play-raw-clip.md) | Play the raw clip | Instant preview | M | 15, 16, 17 | Done |
+| [DS-19](DS-19-playback-fallback.md) | Fall back to the server render | Instant preview | S–M | 18 | Done, but the real-device browser matrix is still owed |
+| [DS-20](DS-20-segmented-control.md) | Shared `Segmented` control | Review speed | XS | — | Done |
+| [DS-21](DS-21-review-speed-control.md) | Review at 0.5× / 0.75× / 1× | Review speed | S | 18, 20 | Done |
+| [DS-22](DS-22-manual-alignment-api.md) | Manual alignment model + endpoints | Manual alignment | S | — | Done |
+| [DS-23](DS-23-effective-alignment.md) | Use the effective alignment | Manual alignment | S | 03, 22 | Done |
+| [DS-24](DS-24-fine-tune-ui.md) | Fine-tune panel | Manual alignment | M | 23 | Done |
+| [DS-25](DS-25-both-sound.md) | "Both" sound for tuning by ear | Manual alignment | XS | 17, 24 | Done |
+| [DS-26](DS-26-manual-placement-fallback.md) | Manual placement on failure | Manual alignment | S | 05, 24 | Done |
+| [DS-27](DS-27-compare-command.md) | One compare command | Layouts | S | — | Done |
+| [DS-28](DS-28-layout-api.md) | `stacked` through the API | Layouts | XS | 03, 27 | Done |
+| [DS-29](DS-29-layout-picker.md) | Pick a layout on Watch | Layouts | S | 20, 28 | Done |
+| [DS-30](DS-30-youtube-url-validation.md) | URL allowlist + metadata probe | YouTube | S | — | |
+| [DS-31](DS-31-youtube-import-route.md) | Download an import | YouTube | M | 30 | |
+| [DS-32](DS-32-youtube-ui.md) | Paste a link on the Song step | YouTube | XS | 31 | |
+| [DS-33](DS-33-edit-models-api.md) | Framing and trim model + endpoints | Editing | S | — | |
+| [DS-34](DS-34-framing-filters.md) | `framing.py` filter builders | Editing | S | 33 | |
+| [DS-35](DS-35-trimmed-offset.md) | `trimmed_offset` | Editing | S | 33 | |
+| [DS-36](DS-36-render-with-edits.md) | Renders apply the edits | Editing | M | 03, 34, 35 | |
+| [DS-37](DS-37-framing-preview.md) | Live edit preview | Editing | S | 18, 33 | |
+| [DS-38](DS-38-adjust-ui.md) | Adjust: crop, mirror, rotate | Editing | M | 37 | |
+| [DS-39](DS-39-trim-ui.md) | Trim the take | Editing | S | 35, 38 | |
+| [DS-40](DS-40-coarse-rate-grid.md) | Coarse rate grid + dedupe | Practice speeds | M | — | |
+| [DS-41](DS-41-incremental-feature-cache.md) | Cache only missing rates | Practice speeds | S | 40 | |
+| [DS-42](DS-42-rate-refinement.md) | Measure the rate from drift | Practice speeds | M | 40 | |
+| [DS-43](DS-43-precompute-on-upload.md) | Stretch on song upload | Practice speeds | S | 13, 41 | |
+| [DS-44](DS-44-offgrid-rate-tests.md) | Off-grid coverage + display | Practice speeds | S | 42 | |
+| [DS-45](DS-45-stretch-clip-experiment.md) | Experiment: stretch the clip | Practice speeds | S | 40 | |
+| [DS-46](DS-46-follow-dancer-spike.md) | Spike: follow one dancer | Follow dancer | L | 13 | |
+| [DS-47](DS-47-keyframed-crop.md) | Fallback: keyframed crop | Follow dancer | M | 36, 46 fails | |
 
 ## Decisions made while writing these
 

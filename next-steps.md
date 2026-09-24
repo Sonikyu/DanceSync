@@ -1,6 +1,6 @@
 # DanceSync — Build Plan
 
-The alignment spike validated the approach, and the MVP (Phases 1–4) is built: upload a song and a practice video, align them, confirm the match when it's ambiguous, and watch or download the synced result. What's left is Phase 5 (polish and deployment) and the post-MVP features. Each feature is specced in [`specs/`](specs/) so it can be handed to Claude Code as a self-contained task, and each spec is broken into day-sized tickets in [`tickets/`](tickets/). **This file holds status and rationale; [`tickets/README.md`](tickets/README.md) holds the working order.**
+The alignment spike validated the approach, and the MVP (Phases 1–4) is built: upload a song and a practice video, align them, confirm the match when it's ambiguous, and watch or download the synced result. Phase 5's MVP items are done (CI, error cases, one-command Docker run, access control), and so are the first four post-MVP features (instant preview, review speed, manual alignment, layouts). What's left is the rest of Phase 5 (job queue, benchmark harness) and post-MVP features 5–8. Each feature is specced in [`specs/`](specs/) so it can be handed to Claude Code as a self-contained task, and each spec is broken into day-sized tickets in [`tickets/`](tickets/). **This file holds status and rationale; [`tickets/README.md`](tickets/README.md) holds the working order.**
 
 **Audience:** the owner and friends, running DanceSync locally or self-hosted rather than as a public site. That shapes Phase 5, which needs basic access control but nothing for multiple tenants, and it's what makes YouTube import viable.
 
@@ -15,7 +15,8 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 1. **Song:** pick a song used before, or upload a new one (an audio file, or a video of the choreography).
 2. **Video:** upload the practice video. The server aligns it, which takes 10–30 s.
 3. **Match:** this step appears only when the match is ambiguous (a repeated chorus, `peak_ratio` < 1.2). It shows the top 3 candidates on a song timeline and plays 8 s of the song at each one, and the user picks the right one.
-4. **Watch:** the synced take plays next to the reference video, with one play bar for both. The sound can be the song or the room (the phone's own recording). The user can slow the review to 0.5× or 0.75×, pick a layout (side by side, stacked, or take only), and download exactly what's on screen.
+4. **Watch:** plays as soon as alignment finishes. The browser plays the uploaded video itself, sped up to full tempo, next to the reference video, with one play bar for both; nothing is rendered until Download. The sound can be the song or the room (the phone's own recording). The user can slow the review to 0.5× or 0.75×, pick a layout (side by side, stacked, or take only), fine-tune a slightly-off match by ear, and download exactly what's on screen.
+5. **No match:** when the take can't be found in the song, the user places it by hand on the song's timeline and fine-tunes from there.
 
 ---
 
@@ -27,12 +28,12 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 | 2. Backend API | Done |
 | 3. Video sync engine | Done |
 | 4. Web UI | Done |
-| 5. Polish & deploy | Not started; the items marked **MVP** are what's left before the MVP is done |
-| Post-MVP features | Specced in [`specs/`](specs/) |
+| 5. Polish & deploy | MVP items done (CI, error cases, Docker, access control), plus the render cache cap and the hosting runbook. Left: job queue with progress, benchmark harness |
+| Post-MVP features | 1–4 done (instant preview, review speed, manual alignment, layouts); 5–8 specced in [`specs/`](specs/) |
 
 Invariant 7 (render cache names) is enforced by one `RenderParams` record shared by the server's cache id and the browser's URL, with a test that fails if they drift (DS-03).
 
-pytest covers the Tier A matcher regression, the ambiguity threshold, the API routes, and real ffmpeg renders. Vitest covers the UI's pure helpers in `web/src/flow.js`.
+pytest covers the Tier A matcher regression, the ambiguity threshold, the API routes, and real ffmpeg renders. Vitest covers the UI's pure helpers in `web/src/flow.js` and `web/src/tuning.js`, and `api.js`'s URL building.
 
 ---
 
@@ -90,7 +91,7 @@ Ticketed as three separate tracks — Ship (what's left before the MVP is done),
 - **Tests in CI (MVP):** done. `.github/workflows/test.yml` runs `pytest` and `npm --prefix web test` on every PR.
 - **Error cases (MVP):** friendly messages already exist for files that are too big, unsupported file types, and an unreachable server. Still needed:
   - ~~clips too short to match~~ (done: `MIN_CLIP_SEC` = 10 s, measured; the upload answers 422 with the clip's length)
-  - ~~no strong peak anywhere~~ (done: `MIN_MATCH_SCORE` = 3.5, measured; `AlignmentResult.failed` and a "couldn't find this take" screen with a "watch anyway" escape). Handing off to manual placement ([manual-alignment](specs/manual-alignment.md)) is DS-26.
+  - ~~no strong peak anywhere~~ (done: `MIN_MATCH_SCORE` = 3.5, measured; `AlignmentResult.failed` and a "couldn't find this take" screen that leads to placing the take by hand ([manual-alignment](specs/manual-alignment.md), DS-26), with a "watch anyway" escape).
   - ~~a startup check that stops the server if ffmpeg is missing~~ (done)
 - **One-command run (MVP):** done. A multi-stage `Dockerfile` (Node builds `web/dist`, Python 3.11 slim with ffmpeg runs it), FastAPI serving that build from the API's origin (`server/web.py`), and `docker compose up` with named volumes for data and cache. Settings come from `DANCESYNC_*` env vars (`.env.example`).
 - **Access control:** done. Set `DANCESYNC_PASSPHRASE` and every `/api` request needs the cookie from `POST /api/session`; the web app shows a sign-in screen. Unset means no sign-in, as before.
@@ -110,8 +111,8 @@ These come from `TODO.md`, and each one has its own spec. Recommended order:
 
 | # | Feature | Spec | Size | Depends on |
 |---|---|---|---|---|
-| 1 | Instant preview (watch before rendering) — **partly done**: the player leads from the sound-making element and re-times one room render live (DS-17, and DS-18's timing); playing the raw clip instead of that render, with a fallback (DS-18, DS-19), is left | [instant-preview.md](specs/instant-preview.md) | M | — |
-| 2 | Review speed on Watch (0.5× / 0.75× / 1×) — **done** (on the rendered take; instant preview passes the matched rate to `playbackRates`) | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
+| 1 | Instant preview (watch before rendering) — **done**; DS-19's manual browser matrix on a real iPhone and Safari is still owed | [instant-preview.md](specs/instant-preview.md) | M | — |
+| 2 | Review speed on Watch (0.5× / 0.75× / 1×) — **done** | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
 | 3 | Manual alignment + speed tuning — **done** (fine-tune panel, Both sound, manual placement on failure) | [manual-alignment.md](specs/manual-alignment.md) | S–M | 1 |
 | 4 | Layouts: side by side, stacked, take only — **done** | [layouts.md](specs/layouts.md) | S | 1 (easier after) |
 | 5 | YouTube import | [youtube-import.md](specs/youtube-import.md) | S–M | access control before exposing it on the internet |
