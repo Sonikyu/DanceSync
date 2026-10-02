@@ -22,6 +22,11 @@ ALLOWED_ORIGINS = os.environ.get(
 # than this. Each one is a cache: deleting it only costs a re-render.
 RENDER_CACHE_MAX_BYTES = int(float(os.environ.get("DANCESYNC_RENDER_CACHE_GB", 5)) * 1024**3)
 
+# A practice speed set by hand on Watch must lie in this range. The UI's
+# speed buttons stop at the same bounds (MANUAL_RATES in web/src/flow.js).
+MIN_MANUAL_RATE = 0.25
+MAX_MANUAL_RATE = 1.0
+
 # The output of `npm --prefix web run build`. Served at / when it exists.
 WEB_DIST = Path(os.environ.get("DANCESYNC_WEB_DIST", ROOT / "web" / "dist"))
 

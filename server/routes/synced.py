@@ -14,7 +14,7 @@ from dancesync.sync import Sound
 from server import config, render_cache
 from server.catalog import Catalog
 from server.deps import get_catalog, get_storage
-from server.models import Candidate, Clip, Layout, RenderParams, render_cache_id
+from server.models import Clip, Layout, RenderParams, effective_alignment, render_cache_id
 from server.storage import LocalStorage
 from server.worker import sync_clip
 
@@ -60,21 +60,16 @@ def download_synced(
     return FileResponse(out_path, media_type="video/mp4", filename=_download_name(clip, params))
 
 
-def _chosen_candidate(clip: Clip) -> Candidate:
-    """The user's pick if they made one, else the matcher's best guess."""
-    index = clip.alignment.selected_index
-    return clip.alignment.top_candidates[0 if index is None else index]
-
-
 def _render_params(clip: Clip, sound: Sound, layout: Layout) -> RenderParams:
-    """What this request renders. The alignment comes from the catalog, not
-    the URL: the browser's copy of it only keeps its own cache honest."""
-    candidate = _chosen_candidate(clip)
+    """What this request renders, at the clip's effective alignment. The
+    alignment comes from the catalog, not the URL: the browser's copy of it
+    only keeps its own cache honest."""
+    alignment = effective_alignment(clip.alignment)
     return RenderParams(
         clip_id=clip.id,
         reference_id=clip.reference_id,
-        rate=candidate.rate,
-        offset_sec=candidate.offset_sec,
+        rate=alignment.rate,
+        offset_sec=alignment.offset_sec,
         layout=layout,
         sound=sound,
     )

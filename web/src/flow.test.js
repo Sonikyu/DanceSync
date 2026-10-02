@@ -1,17 +1,20 @@
+import { syncedVideoUrl } from "./api.js";
 import { describe, expect, test } from "vitest";
 import {
   chosenCandidate,
   clipTimeFor,
   clipTooShortMessage,
+  effectiveAlignment,
   formatRate,
   formatTime,
   layoutFor,
-  leaderFor,
+  leaderAt,
   nextOption,
   playbackRates,
   outputTimeFor,
   referenceTimeFor,
   renderParams,
+  takeRateFor,
   songTitle,
   stageOf,
   stepAfterAlignment,
@@ -47,6 +50,10 @@ describe("step flow", () => {
 
   test("no match stands in for the watch stage", () => {
     expect(stageOf("nomatch")).toBe(stageOf("watch"));
+  });
+
+  test("placing a take by hand stands in for the match step", () => {
+    expect(stageOf("place")).toBe(stageOf("match"));
   });
 
   test("a too-short clip is told its length and the minimum", () => {
@@ -158,8 +165,31 @@ describe("clip and output time", () => {
   });
 
   test("the element making the sound leads", () => {
-    expect(leaderFor("song")).toBe("reference");
-    expect(leaderFor("room")).toBe("take");
+    const at = (sound, outputSec) => leaderAt({ sound, outputSec, offsetSec: 30, songDurationSec: 200 });
+    expect(at("song", 10)).toBe("reference");
+    expect(at("room", 10)).toBe("take");
+    expect(at("both", 10)).toBe("take");
+  });
+
+  test("with no song playing yet or any more, the take leads", () => {
+    const at = (outputSec) => leaderAt({ sound: "song", outputSec, offsetSec: -2, songDurationSec: 100 });
+    expect(at(1.5)).toBe("take");        // the phone started recording 2 s early
+    expect(at(2)).toBe("reference");
+    expect(at(101.9)).toBe("reference");
+    expect(at(102)).toBe("take");        // the take outlasts the song
+  });
+
+  test("the raw clip, never re-timed, runs at the alignment's rate", () => {
+    expect(takeRateFor(0.75, 1)).toBe(0.75);
+    expect(playbackRates({ rate: takeRateFor(0.75, 1), speed: 1 }).take).toBeCloseTo(4 / 3, 12);
+  });
+
+  test("a render re-timed to a tuned rate runs at their ratio", () => {
+    expect(takeRateFor(0.75, 0.75)).toBe(1);
+    expect(takeRateFor(0.8, 0.75)).toBeCloseTo(16 / 15, 12);
+    // A 0.75 render tuned to 0.8: render second 3 is clip second 4, which is
+    // output second 3.2 at the tuned rate.
+    expect(outputTimeFor(3, takeRateFor(0.8, 0.75))).toBeCloseTo(3.2, 12);
   });
 });
 
@@ -216,5 +246,25 @@ describe("layout", () => {
       expect(layoutFor({ picked: null, wideViewport, hasReferenceVideo: false })).toBe("take");
       expect(layoutFor({ picked: "stacked", wideViewport, hasReferenceVideo: false })).toBe("take");
     }
+  });
+});
+
+describe("manual alignment", () => {
+  const MANUAL = { rate: 0.8, offset_sec: 72.15 };
+
+  test("the effective alignment is manual when set, else the chosen candidate", () => {
+    expect(effectiveAlignment(clipWith({}))).toBe(CANDIDATES[0]);
+    expect(effectiveAlignment(clipWith({ selected_index: 1 }))).toBe(CANDIDATES[1]);
+    expect(effectiveAlignment(clipWith({ selected_index: 1, manual: MANUAL }))).toBe(MANUAL);
+  });
+
+  test("tuning changes the render's URL, and clearing it changes it back", () => {
+    const url = (clip) => syncedVideoUrl("clip", renderParams({ reference_id: "ref", ...clip }, "song", "take"));
+    const automatic = url(clipWith({}));
+    const tuned = url(clipWith({ manual: MANUAL }));
+
+    expect(tuned).not.toBe(automatic);
+    expect(tuned).toContain("rate=0.8&offset_sec=72.15");
+    expect(url(clipWith({ manual: null }))).toBe(automatic);
   });
 });

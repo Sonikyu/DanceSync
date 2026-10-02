@@ -3,10 +3,11 @@
 
 // The header dots show three stages. Checking an ambiguous match counts as
 // part of the video stage, so the dots never skip ahead when it's not needed.
-// "No match" stands in for the player, so it's the watch stage.
+// "No match" stands in for the player, so it's the watch stage; placing the
+// take by hand afterwards stands in for the match step.
 export const STAGES = ["Song", "Video", "Watch"];
 
-const STAGE_OF_STEP = { song: 0, video: 1, match: 1, watch: 2, nomatch: 2 };
+const STAGE_OF_STEP = { song: 0, video: 1, match: 1, place: 1, watch: 2, nomatch: 2 };
 
 export function stageOf(step) {
   return STAGE_OF_STEP[step];
@@ -27,8 +28,7 @@ export function clipTooShortMessage(durationSec, minSec) {
   );
 }
 
-// The user's pick if they made one, else the matcher's best guess -- the same
-// rule the server applies when it renders.
+// The user's pick if they made one, else the matcher's best guess.
 function chosenIndex(clip) {
   return clip.alignment.selected_index ?? 0;
 }
@@ -37,14 +37,21 @@ export function chosenCandidate(clip) {
   return clip.alignment.top_candidates[chosenIndex(clip)];
 }
 
+// What the take plays at, as { rate, offset_sec }: the dancer's manual
+// alignment if they set one, else the chosen candidate. The same rule as the
+// server's effective_alignment, which renders with it.
+export function effectiveAlignment(clip) {
+  return clip.alignment.manual ?? chosenCandidate(clip);
+}
+
 // What a /synced render depends on, for api.syncedVideoUrl: the clip's song,
 // the alignment it plays at, and which render.
 export function renderParams(clip, sound, layout) {
-  const candidate = chosenCandidate(clip);
+  const alignment = effectiveAlignment(clip);
   return {
     reference_id: clip.reference_id,
-    rate: candidate.rate,
-    offset_sec: candidate.offset_sec,
+    rate: alignment.rate,
+    offset_sec: alignment.offset_sec,
     layout,
     sound,
   };
@@ -108,19 +115,34 @@ export function layoutFor({ picked, wideViewport, hasReferenceVideo }) {
 export const REVIEW_SPEEDS = [0.5, 0.75, 1];
 
 // `playbackRate`s for reviewing at `speed`. The song always plays at `speed`.
-// `rate` is the take media's own speed relative to the song: 1 for a
-// rendered take, which is already at full tempo, or the matched rate for the
+// `rate` is the take media's own speed relative to the song (takeRateFor):
+// 1 for a render at the alignment being played, or the matched rate for the
 // raw clip, which then plays at speed / rate -- exactly 1.0, as filmed, when
 // the dancer reviews at the speed they practised.
 export function playbackRates({ rate, speed }) {
   return { take: speed / rate, reference: speed };
 }
 
-// The element making the sound is the clock and the muted one follows it:
-// nudging a muted video's speed is invisible, nudging audio warbles. The
-// song plays from the reference element, the room from the take.
-export function leaderFor(sound) {
-  return sound === "room" ? "take" : "reference";
+// The take media's own speed relative to the song -- the `rate` for the
+// timing helpers above -- when media re-timed at `renderedRate` plays an
+// alignment at `rate`. The raw clip, as filmed, was never re-timed: its
+// renderedRate is 1 and its take rate is the alignment's rate. A render
+// already runs at full tempo, so re-timing it live to a tuned rate is the
+// ratio of the two: 1 when nothing was tuned.
+export function takeRateFor(rate, renderedRate) {
+  return rate / renderedRate;
+}
+
+// Which element is the clock at output time `outputSec`: the one making the
+// sound, since nudging a muted video's speed is invisible and nudging audio
+// warbles. The song plays from the reference element, the room from the
+// take, and "both" leads from the take so the song is the one nudged. Before
+// the song starts (a negative offset) and after it ends, there's no song to
+// lead with, so the take leads.
+export function leaderAt({ sound, outputSec, offsetSec, songDurationSec }) {
+  if (sound !== "song") return "take";
+  const songSec = referenceTimeFor(outputSec, offsetSec);
+  return songSec !== null && songSec < songDurationSec ? "reference" : "take";
 }
 
 // Where an offset sits along the song, as a CSS percentage clamped to the bar.

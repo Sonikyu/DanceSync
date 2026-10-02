@@ -3,6 +3,7 @@ import { getSession } from "./api.js";
 import { stageOf, stepAfterAlignment } from "./flow.js";
 import MatchStep from "./components/MatchStep.jsx";
 import NoMatchStep from "./components/NoMatchStep.jsx";
+import PlaceStep from "./components/PlaceStep.jsx";
 import SignInStep from "./components/SignInStep.jsx";
 import SongStep from "./components/SongStep.jsx";
 import StepDots from "./components/StepDots.jsx";
@@ -10,7 +11,8 @@ import VideoStep from "./components/VideoStep.jsx";
 import WatchStep from "./components/WatchStep.jsx";
 
 // One screen at a time: song -> video -> match (only when ambiguous) -> watch.
-// A failed match shows "no match" in place of watch.
+// A failed match shows "no match" in place of watch, which leads on to
+// placing the take by hand.
 // Sign-in comes first, only when the server has a passphrase set.
 export default function App() {
   const [signedIn, setSignedIn] = useState(null);   // null = still asking the server
@@ -18,6 +20,7 @@ export default function App() {
   const [song, setSong] = useState(null);
   const [clip, setClip] = useState(null);
   const [layoutPick, setLayoutPick] = useState(null);   // null = the default for the screen
+  const [startTuning, setStartTuning] = useState(false);   // open Watch with fine-tune, after placing by hand
 
   useEffect(() => {
     // Unreachable server: carry on, so the song step shows its own error.
@@ -34,8 +37,9 @@ export default function App() {
     setStep(stepAfterAlignment(alignedClip));
   }
 
-  function finishMatch(updatedClip) {
+  function watch(updatedClip, tuning) {
     setClip(updatedClip);
+    setStartTuning(tuning);
     setStep("watch");
   }
 
@@ -51,24 +55,30 @@ export default function App() {
         <VideoStep song={song} onBack={() => setStep("song")} onAligned={finishAlignment} />
       )}
       {step === "match" && (
-        <MatchStep song={song} clip={clip} onBack={() => setStep("video")} onPicked={finishMatch} />
+        <MatchStep song={song} clip={clip} onBack={() => setStep("video")} onPicked={(picked) => watch(picked, false)} />
       )}
       {step === "nomatch" && (
         <NoMatchStep
           song={song}
           onNewTake={() => setStep("video")}
           onNewSong={() => setStep("song")}
-          onWatchAnyway={() => setStep("watch")}
+          onPlaceByHand={() => setStep("place")}
+          onWatchAnyway={() => watch(clip, false)}
         />
+      )}
+      {step === "place" && (
+        <PlaceStep song={song} clip={clip} onBack={() => setStep("nomatch")} onPlaced={(placed) => watch(placed, true)} />
       )}
       {step === "watch" && (
         <WatchStep
           song={song}
           clip={clip}
+          onClipChange={setClip}
           onChangeMatch={() => setStep("match")}
           onNewTake={() => setStep("video")}
           layoutPick={layoutPick}
           onLayoutPick={setLayoutPick}
+          startTuning={startTuning}
         />
       )}
     </div>
