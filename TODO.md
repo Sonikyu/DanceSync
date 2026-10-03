@@ -15,3 +15,4 @@ Jot new ideas here. When an idea is worth building, write a spec for it in `spec
 - playback speed: [specs/review-speed.md](specs/review-speed.md) and [specs/practice-speeds.md](specs/practice-speeds.md)
 - youtube url scraping: [specs/youtube-import.md](specs/youtube-import.md)
 - manual alignment + speed tuning?: [specs/manual-alignment.md](specs/manual-alignment.md)
+- make it a web app, not just locally hosted (same group, easier hosting): [specs/managed-hosting.md](specs/managed-hosting.md)

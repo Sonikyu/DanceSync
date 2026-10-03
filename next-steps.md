@@ -29,7 +29,7 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 | 3. Video sync engine | Done |
 | 4. Web UI | Done |
 | 5. Polish & deploy | MVP items done (CI, error cases, Docker, access control), plus the render cache cap and the hosting runbook. Left: job queue with progress, benchmark harness |
-| Post-MVP features | 1–4 done (instant preview, review speed, manual alignment, layouts); 5–8 specced in [`specs/`](specs/) |
+| Post-MVP features | 1–4 done (instant preview, review speed, manual alignment, layouts); 5–9 specced in [`specs/`](specs/) |
 
 Invariant 7 (render cache names) is enforced by one `RenderParams` record shared by the server's cache id and the browser's URL, with a test that fails if they drift (DS-03).
 
@@ -119,6 +119,7 @@ These come from `TODO.md`, and each one has its own spec. Recommended order:
 | 6 | Basic editing: crop, mirror, rotate, trim | [video-editing.md](specs/video-editing.md) | M | 1 |
 | 7 | Takes at any practice speed | [practice-speeds.md](specs/practice-speeds.md) | M | — |
 | 8 | Follow one dancer | [follow-dancer.md](specs/follow-dancer.md) | L | 6, background jobs, **a spike first** |
+| 9 | One-click managed hosting (Render), for the same owner-and-friends group | [managed-hosting.md](specs/managed-hosting.md) | S | — on Render; background jobs on Fly.io |
 
 - **1 comes first.** It's the speedup the user will notice most. It also means 2, 3, 4, and 6 only need changes to the preview, plus one render at download time.
 - **3 is the safety net.** It lets the user fix a match that's slightly off. Until 7 lands, it also covers takes at speeds the matcher doesn't try. And when alignment fails outright, the user can still place the take by hand.
@@ -131,5 +132,6 @@ instant-preview ─┬─→ review-speed
                  ├─→ layouts
                  └─→ video-editing ──→ follow-dancer ←── background jobs (Phase 5)
 youtube-import        (independent)
+managed-hosting       (independent)
 practice-speeds       (independent)
 ```
