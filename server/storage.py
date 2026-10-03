@@ -56,5 +56,21 @@ class LocalStorage:
             shutil.move(str(tmp_path), str(final_path))
         return content_id, final_path
 
+    def save_file(self, kind: str, src_path: Path, filename: str) -> tuple[str, Path]:
+        """Move an already-downloaded file into place, returning (content-hash
+        id, saved path). `src_path` must be on the same filesystem, so the
+        move is a rename."""
+        digest = hashlib.sha256()
+        with open(src_path, "rb") as src:
+            while chunk := src.read(_HASH_CHUNK):
+                digest.update(chunk)
+
+        content_id = digest.hexdigest()[:32]
+        final_path = self.path_for(kind, content_id, Path(filename).suffix.lower())
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        if not final_path.exists():
+            src_path.replace(final_path)
+        return content_id, final_path
+
     def path_for(self, kind: str, content_id: str, suffix: str) -> Path:
         return self.root / kind / f"{content_id}{suffix}"

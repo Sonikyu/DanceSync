@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listReferences, uploadReference } from "../api.js";
+import { importReference, listReferences, uploadReference } from "../api.js";
 import { formatTime, songTitle } from "../flow.js";
 import DropZone from "./DropZone.jsx";
 import Working from "./Working.jsx";
@@ -7,6 +7,7 @@ import Working from "./Working.jsx";
 export default function SongStep({ onPick }) {
   const [songs, setSongs] = useState([]);
   const [progress, setProgress] = useState(null);   // null = not uploading
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -22,6 +23,25 @@ export default function SongStep({ onPick }) {
       setError(err.message);
       setProgress(null);
     }
+  }
+
+  async function importSong(url) {
+    setError(null);
+    setImporting(true);
+    try {
+      onPick(await importReference(url));
+    } catch (err) {
+      setError(err.message);
+      setImporting(false);
+    }
+  }
+
+  if (importing) {
+    return (
+      <section className="step">
+        <Working label="Downloading from YouTube…" progress={null} hint="This can take a minute." />
+      </section>
+    );
   }
 
   if (progress !== null) {
@@ -44,6 +64,7 @@ export default function SongStep({ onPick }) {
         hint="or drop it here · MP3, M4A, WAV"
         onFile={addSong}
       />
+      <LinkForm onSubmit={importSong} />
       {error && <p className="error">{error}</p>}
     </section>
   );
@@ -61,5 +82,30 @@ function SongList({ songs, onPick }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function LinkForm({ onSubmit }) {
+  const [url, setUrl] = useState("");
+
+  function submit(event) {
+    event.preventDefault();
+    onSubmit(url.trim());
+  }
+
+  return (
+    <form className="link-form" onSubmit={submit}>
+      <input
+        className="field"
+        type="url"
+        placeholder="or paste a YouTube link"
+        aria-label="YouTube link"
+        value={url}
+        onChange={(event) => setUrl(event.target.value)}
+      />
+      <button className="button" type="submit" disabled={!url.trim()}>
+        Import
+      </button>
+    </form>
   );
 }

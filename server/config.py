@@ -12,6 +12,12 @@ STORAGE_ROOT = Path(os.environ.get("DANCESYNC_STORAGE_ROOT", ROOT / ".data" / "s
 MAX_REFERENCE_BYTES = int(os.environ.get("DANCESYNC_MAX_REFERENCE_MB", 100)) * 1024 * 1024
 MAX_CLIP_BYTES = int(os.environ.get("DANCESYNC_MAX_CLIP_MB", 500)) * 1024 * 1024
 
+# YouTube imports: a 4-minute 1080p video can pass the 100 MB song upload
+# limit, so imports get their own, and anything longer than a practice video
+# is turned away before downloading.
+MAX_IMPORT_BYTES = int(os.environ.get("DANCESYNC_MAX_IMPORT_MB", 300)) * 1024 * 1024
+MAX_IMPORT_DURATION_SEC = 15 * 60
+
 # Only needed when the web app is served from a different origin than the
 # API. The Vite dev proxy and the built app served by FastAPI both avoid that.
 ALLOWED_ORIGINS = os.environ.get(

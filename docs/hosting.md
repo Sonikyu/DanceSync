@@ -160,4 +160,12 @@ location / {
 
 ## YouTube import from this host
 
-Not tested yet. YouTube import (DS-30–32) isn't built, and it's deferred for now. Once it lands, try one import from the server before relying on it, because YouTube often blocks datacenter IP ranges. If the VPS gets blocked, the home-machine-over-Tailscale setup has a residential IP and usually isn't. Record the result here.
+Not tested from a VPS yet. Try one import from the server before relying on it, because YouTube often blocks datacenter IP ranges with "confirm you're not a bot". If the VPS gets blocked, the home-machine-over-Tailscale setup has a residential IP and usually isn't. Record the result here.
+
+**When imports start failing everywhere, update yt-dlp.** YouTube changes break it every few weeks. Rebuild the image without the cache so pip fetches the newest release:
+
+```bash
+docker compose build --no-cache && docker compose up -d
+```
+
+Outside Docker, run `.venv/bin/pip install -U 'yt-dlp[default]'`. yt-dlp also needs a JavaScript runtime for YouTube; the image ships [Deno](https://deno.com), and a local install needs `deno` on the `PATH`.

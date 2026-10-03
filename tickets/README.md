@@ -23,7 +23,7 @@ Ids are stable and never reused. They are grouped by track, and the number does 
 
 ## Recommended order
 
-Steps 1–5 are done (see the Status column in the index below). Next up is step 6, by what you need.
+Steps 1–5 are done, and so is YouTube import from step 6 (see the Status column in the index below). Next up is the rest of step 6, by what you need.
 
 **1 · Foundations** — [DS-01](DS-01-ci-test-workflow.md), [DS-02](DS-02-ffmpeg-startup-check.md), [DS-03](DS-03-render-params-record.md).
 DS-01 first, literally: every ticket after it relies on CI being real. DS-03 before any feature that changes a render, which is five of the eight.
@@ -75,9 +75,9 @@ The safety net: it fixes a slightly-off match, covers speeds the matcher doesn't
 | [DS-27](DS-27-compare-command.md) | One compare command | Layouts | S | — | Done |
 | [DS-28](DS-28-layout-api.md) | `stacked` through the API | Layouts | XS | 03, 27 | Done |
 | [DS-29](DS-29-layout-picker.md) | Pick a layout on Watch | Layouts | S | 20, 28 | Done |
-| [DS-30](DS-30-youtube-url-validation.md) | URL allowlist + metadata probe | YouTube | S | — | |
-| [DS-31](DS-31-youtube-import-route.md) | Download an import | YouTube | M | 30 | |
-| [DS-32](DS-32-youtube-ui.md) | Paste a link on the Song step | YouTube | XS | 31 | |
+| [DS-30](DS-30-youtube-url-validation.md) | URL allowlist + metadata probe | YouTube | S | — | Done |
+| [DS-31](DS-31-youtube-import-route.md) | Download an import | YouTube | M | 30 | Done, but a real download is untested (see the PR) |
+| [DS-32](DS-32-youtube-ui.md) | Paste a link on the Song step | YouTube | XS | 31 | Done |
 | [DS-33](DS-33-edit-models-api.md) | Framing and trim model + endpoints | Editing | S | — | |
 | [DS-34](DS-34-framing-filters.md) | `framing.py` filter builders | Editing | S | 33 | |
 | [DS-35](DS-35-trimmed-offset.md) | `trimmed_offset` | Editing | S | 33 | |

@@ -1,6 +1,6 @@
 # DanceSync — Build Plan
 
-The alignment spike validated the approach, and the MVP (Phases 1–4) is built: upload a song and a practice video, align them, confirm the match when it's ambiguous, and watch or download the synced result. Phase 5's MVP items are done (CI, error cases, one-command Docker run, access control), and so are the first four post-MVP features (instant preview, review speed, manual alignment, layouts). What's left is the rest of Phase 5 (job queue, benchmark harness) and post-MVP features 5–8. Each feature is specced in [`specs/`](specs/) so it can be handed to Claude Code as a self-contained task, and each spec is broken into day-sized tickets in [`tickets/`](tickets/). **This file holds status and rationale; [`tickets/README.md`](tickets/README.md) holds the working order.**
+The alignment spike validated the approach, and the MVP (Phases 1–4) is built: upload a song and a practice video, align them, confirm the match when it's ambiguous, and watch or download the synced result. Phase 5's MVP items are done (CI, error cases, one-command Docker run, access control), and so are the first five post-MVP features (instant preview, review speed, manual alignment, layouts, YouTube import). What's left is the rest of Phase 5 (job queue, benchmark harness) and post-MVP features 6–9. Each feature is specced in [`specs/`](specs/) so it can be handed to Claude Code as a self-contained task, and each spec is broken into day-sized tickets in [`tickets/`](tickets/). **This file holds status and rationale; [`tickets/README.md`](tickets/README.md) holds the working order.**
 
 **Audience:** the owner and friends, running DanceSync locally or self-hosted rather than as a public site. That shapes Phase 5, which needs basic access control but nothing for multiple tenants, and it's what makes YouTube import viable.
 
@@ -12,7 +12,7 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 
 ### User flow (as built)
 
-1. **Song:** pick a song used before, or upload a new one (an audio file, or a video of the choreography).
+1. **Song:** pick a song used before, upload a new one (an audio file, or a video of the choreography), or paste a YouTube link to one.
 2. **Video:** upload the practice video. The server aligns it, which takes 10–30 s.
 3. **Match:** this step appears only when the match is ambiguous (a repeated chorus, `peak_ratio` < 1.2). It shows the top 3 candidates on a song timeline and plays 8 s of the song at each one, and the user picks the right one.
 4. **Watch:** plays as soon as alignment finishes. The browser plays the uploaded video itself, sped up to full tempo, next to the reference video, with one play bar for both; nothing is rendered until Download. The sound can be the song or the room (the phone's own recording). The user can slow the review to 0.5× or 0.75×, pick a layout (side by side, stacked, or take only), fine-tune a slightly-off match by ear, and download exactly what's on screen.
@@ -29,7 +29,7 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 | 3. Video sync engine | Done |
 | 4. Web UI | Done |
 | 5. Polish & deploy | MVP items done (CI, error cases, Docker, access control), plus the render cache cap and the hosting runbook. Left: job queue with progress, benchmark harness |
-| Post-MVP features | 1–4 done (instant preview, review speed, manual alignment, layouts); 5–9 specced in [`specs/`](specs/) |
+| Post-MVP features | 1–5 done (instant preview, review speed, manual alignment, layouts, YouTube import); 6–9 specced in [`specs/`](specs/) |
 
 Invariant 7 (render cache names) is enforced by one `RenderParams` record shared by the server's cache id and the browser's URL, with a test that fails if they drift (DS-03).
 
@@ -57,7 +57,7 @@ Built as planned: FastAPI, local storage keyed by content hash, alignment done s
 - **References are listed newest first.**
 
 Endpoints:
-- `POST /api/references`, `GET /api/references`, `GET /api/references/{id}/media`
+- `POST /api/references`, `POST /api/references/import` (a YouTube link; post-MVP), `GET /api/references`, `GET /api/references/{id}/media`
 - `POST /api/clips`, `GET /api/clips/{id}`, `GET /api/clips/{id}/media` (the uploaded take, with range requests; for instant preview), `POST /api/clips/{id}/select`, `PUT|DELETE /api/clips/{id}/manual` (an alignment set by hand; post-MVP)
 - `GET|HEAD /api/clips/{id}/synced?sound=song|room&layout=take|side-by-side|stacked`
 
@@ -115,7 +115,7 @@ These come from `TODO.md`, and each one has its own spec. Recommended order:
 | 2 | Review speed on Watch (0.5× / 0.75× / 1×) — **done** | [review-speed.md](specs/review-speed.md) | S | 1 (easier after) |
 | 3 | Manual alignment + speed tuning — **done** (fine-tune panel, Both sound, manual placement on failure) | [manual-alignment.md](specs/manual-alignment.md) | S–M | 1 |
 | 4 | Layouts: side by side, stacked, take only — **done** | [layouts.md](specs/layouts.md) | S | 1 (easier after) |
-| 5 | YouTube import | [youtube-import.md](specs/youtube-import.md) | S–M | access control before exposing it on the internet |
+| 5 | YouTube import — **done**; a real download from a VPS is still to be tried | [youtube-import.md](specs/youtube-import.md) | S–M | access control before exposing it on the internet |
 | 6 | Basic editing: crop, mirror, rotate, trim | [video-editing.md](specs/video-editing.md) | M | 1 |
 | 7 | Takes at any practice speed | [practice-speeds.md](specs/practice-speeds.md) | M | — |
 | 8 | Follow one dancer | [follow-dancer.md](specs/follow-dancer.md) | L | 6, background jobs, **a spike first** |
