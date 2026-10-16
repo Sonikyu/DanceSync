@@ -23,7 +23,7 @@ Ids are stable and never reused. They are grouped by track, and the number does 
 
 ## Recommended order
 
-Steps 1–5 are done, and so is YouTube import from step 6 (see the Status column in the index below). Next up is the rest of step 6, by what you need.
+Steps 1–5 are done, and so are YouTube import and video editing from step 6 (see the Status column in the index below). Next up is the rest of step 6, by what you need.
 
 **1 · Foundations** — [DS-01](DS-01-ci-test-workflow.md), [DS-02](DS-02-ffmpeg-startup-check.md), [DS-03](DS-03-render-params-record.md).
 DS-01 first, literally: every ticket after it relies on CI being real. DS-03 before any feature that changes a render, which is five of the eight.
@@ -78,13 +78,13 @@ The safety net: it fixes a slightly-off match, covers speeds the matcher doesn't
 | [DS-30](DS-30-youtube-url-validation.md) | URL allowlist + metadata probe | YouTube | S | — | Done |
 | [DS-31](DS-31-youtube-import-route.md) | Download an import | YouTube | M | 30 | Done, but a real download is untested (see the PR) |
 | [DS-32](DS-32-youtube-ui.md) | Paste a link on the Song step | YouTube | XS | 31 | Done |
-| [DS-33](DS-33-edit-models-api.md) | Framing and trim model + endpoints | Editing | S | — | |
-| [DS-34](DS-34-framing-filters.md) | `framing.py` filter builders | Editing | S | 33 | |
-| [DS-35](DS-35-trimmed-offset.md) | `trimmed_offset` | Editing | S | 33 | |
-| [DS-36](DS-36-render-with-edits.md) | Renders apply the edits | Editing | M | 03, 34, 35 | |
-| [DS-37](DS-37-framing-preview.md) | Live edit preview | Editing | S | 18, 33 | |
-| [DS-38](DS-38-adjust-ui.md) | Adjust: crop, mirror, rotate | Editing | M | 37 | |
-| [DS-39](DS-39-trim-ui.md) | Trim the take | Editing | S | 35, 38 | |
+| [DS-33](DS-33-edit-models-api.md) | Framing and trim model + endpoints | Editing | S | — | Done |
+| [DS-34](DS-34-framing-filters.md) | `framing.py` filter builders | Editing | S | 33 | Done |
+| [DS-35](DS-35-trimmed-offset.md) | `trimmed_offset` | Editing | S | 33 | Done |
+| [DS-36](DS-36-render-with-edits.md) | Renders apply the edits | Editing | M | 03, 34, 35 | Done |
+| [DS-37](DS-37-framing-preview.md) | Live edit preview | Editing | S | 18, 33 | Done |
+| [DS-38](DS-38-adjust-ui.md) | Adjust: crop, mirror, rotate | Editing | M | 37 | Done, but touch on a real phone is untested |
+| [DS-39](DS-39-trim-ui.md) | Trim the take | Editing | S | 35, 38 | Done |
 | [DS-40](DS-40-coarse-rate-grid.md) | Coarse rate grid + dedupe | Practice speeds | M | — | |
 | [DS-41](DS-41-incremental-feature-cache.md) | Cache only missing rates | Practice speeds | S | 40 | |
 | [DS-42](DS-42-rate-refinement.md) | Measure the rate from drift | Practice speeds | M | 40 | |

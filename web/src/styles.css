@@ -148,13 +148,34 @@ button:focus-visible, a:focus-visible, .dropzone:focus-within { outline: 2px sol
 .player { display: flex; flex-direction: column; gap: 12px; }
 .player.side-by-side { align-self: center; width: min(960px, 100vw - 48px); }
 .compare { display: flex; flex-direction: column; gap: 8px; }
-.compare-video { display: block; width: 100%; min-width: 0; max-height: 60dvh; border-radius: var(--radius); background: #000; }
-.compare.stacked .compare-video.take { max-height: 45dvh; }
+.compare-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+
+/* Each video sits in a frame the shape of its crop (--aspect), which hides
+   the rest; editing.framingStyle places, turns and flips the video inside.
+   One above the other, a frame is capped at a share of the screen's height
+   by narrowing it, which keeps its shape. */
+.frame { position: relative; width: min(100%, 60dvh * var(--aspect, 16 / 9)); aspect-ratio: var(--aspect, 16 / 9); overflow: hidden; border-radius: var(--radius); background: #000; }
+.compare.stacked .compare-cell:last-child .frame { width: min(100%, 45dvh * var(--aspect, 16 / 9)); }
+.frame-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: fill; }
+.adjust-link { font-size: 14px; }
 
 /* Side by side, each video's width set by its aspect ratio so both end up
-   the same height. */
-.compare.side-by-side { flex-direction: row; align-items: flex-start; }
-.compare.side-by-side .compare-video { flex: var(--aspect, 1) 1 0; }
+   the same height, and the pair narrowed to fit the screen's height. */
+.compare.side-by-side { flex-direction: row; align-items: flex-start; align-self: center; width: min(100%, 60dvh * var(--pair-aspect, 2) + 8px); }
+.compare.side-by-side .compare-cell { flex: var(--aspect, 1) 1 0; }
+.compare.side-by-side .frame { width: 100%; }
+
+/* Adjust: the crop box over the whole picture, the rest dimmed. The layer
+   takes every touch, so dragging the box never scrolls the page. */
+.crop-layer { position: absolute; inset: 0; touch-action: none; }
+.crop-box { position: absolute; outline: 2px solid #fff; box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.55); cursor: move; }
+.crop-handle { position: absolute; width: 32px; height: 32px; margin: -16px; }
+.crop-handle::after { content: ""; position: absolute; inset: 9px; border: 2px solid var(--accent); border-radius: 50%; background: #fff; }
+.crop-handle.nw { top: 0; left: 0; cursor: nwse-resize; }
+.crop-handle.ne { top: 0; left: 100%; cursor: nesw-resize; }
+.crop-handle.sw { top: 100%; left: 0; cursor: nesw-resize; }
+.crop-handle.se { top: 100%; left: 100%; cursor: nwse-resize; }
+.button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 
 .playbar { display: flex; align-items: center; gap: 12px; }
 .scrubber { flex: 1; min-width: 0; accent-color: var(--accent); }

@@ -20,7 +20,10 @@ import {
   stepAfterAlignment,
   strengthLabel,
   timelinePercent,
+  trimmedOffset,
 } from "./flow.js";
+
+const SONG = { id: "ref", framing: { rotate: 0, crop: null, mirror: false } };
 
 const CANDIDATES = [
   { rate: 0.75, offset_sec: 72.0, score: 0.8, peak_ratio: 1.02 },
@@ -118,13 +121,27 @@ describe("formatting", () => {
 describe("render params", () => {
   test("carry the chosen candidate's alignment and the requested render", () => {
     const clip = { reference_id: "ref", ...clipWith({ selected_index: 1 }) };
-    expect(renderParams(clip, "room", "side-by-side")).toEqual({
+    expect(renderParams(SONG, clip, "room", "side-by-side")).toEqual({
       reference_id: "ref",
       rate: 0.75,
       offset_sec: 132.0,
       layout: "side-by-side",
       sound: "room",
+      edits: expect.stringMatching(/^[0-9a-f]{8}$/),
     });
+  });
+
+  test("any saved edit, to either video, changes the render's URL", () => {
+    const clip = { reference_id: "ref", ...clipWith({}), framing: SONG.framing, trim: null };
+    const url = (song, edited) => syncedVideoUrl("clip", renderParams(song, edited, "song", "take"));
+    const unedited = url(SONG, clip);
+    const mirroredSong = { ...SONG, framing: { ...SONG.framing, mirror: true } };
+    const turnedTake = { ...clip, framing: { ...clip.framing, rotate: 90 } };
+    const trimmedTake = { ...clip, trim: { start_sec: 1, end_sec: 9 } };
+
+    const urls = [unedited, url(mirroredSong, clip), url(SONG, turnedTake), url(SONG, trimmedTake)];
+    expect(new Set(urls).size).toBe(4);
+    expect(url(SONG, { ...clip })).toBe(unedited);
   });
 });
 
@@ -154,6 +171,28 @@ describe("clip and output time", () => {
       expect(Math.abs(outputTimeFor(clipTimeFor(sec, 0.75), 0.75) - sec)).toBeLessThan(1e-12);
       expect(Math.abs(clipTimeFor(outputTimeFor(sec, 0.75), 0.75) - sec)).toBeLessThan(1e-12);
     }
+  });
+
+  test("a trimmed take starts at its trim: output 0 shows the trim's start", () => {
+    expect(clipTimeFor(0, 0.75, 2)).toBe(2);
+    expect(clipTimeFor(3, 0.75, 2)).toBe(6);
+    expect(outputTimeFor(6, 0.75, 2)).toBe(3);
+    expect(outputTimeFor(2, 0.5, 2)).toBe(0);
+  });
+
+  test("a trim moves the song by what the trimmed-off part heard", () => {
+    // Clip second 2 at 0.75× heard 1.5 s of song after the matched offset.
+    expect(trimmedOffset(10, 0.75, 2)).toBe(11.5);
+    expect(trimmedOffset(-1, 1, 0)).toBe(-1);
+  });
+
+  test("trimmed, the take and the song still meet where the untrimmed ones did", () => {
+    // Untrimmed, clip second 6 is output 4.5 and song 14.5. Trimmed from
+    // clip second 2, the same moment is output 3, and still song 14.5.
+    const offsetSec = trimmedOffset(10, 0.75, 2);
+    expect(outputTimeFor(6, 0.75, 2)).toBe(3);
+    expect(referenceTimeFor(outputTimeFor(6, 0.75, 2), offsetSec)).toBe(14.5);
+    expect(referenceTimeFor(outputTimeFor(6, 0.75), 10)).toBe(14.5);
   });
 
   test("with a negative offset, the song starts partway into the take", () => {
@@ -259,7 +298,7 @@ describe("manual alignment", () => {
   });
 
   test("tuning changes the render's URL, and clearing it changes it back", () => {
-    const url = (clip) => syncedVideoUrl("clip", renderParams({ reference_id: "ref", ...clip }, "song", "take"));
+    const url = (clip) => syncedVideoUrl("clip", renderParams(SONG, { reference_id: "ref", ...clip }, "song", "take"));
     const automatic = url(clipWith({}));
     const tuned = url(clipWith({ manual: MANUAL }));
 

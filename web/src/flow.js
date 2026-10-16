@@ -1,6 +1,8 @@
 // Pure helpers for the step flow and for display formatting. No React and no
 // network, so every one of them is covered by plain unit tests.
 
+import { editsKey } from "./editing.js";
+
 // The header dots show three stages. Checking an ambiguous match counts as
 // part of the video stage, so the dots never skip ahead when it's not needed.
 // "No match" stands in for the player, so it's the watch stage; placing the
@@ -45,8 +47,9 @@ export function effectiveAlignment(clip) {
 }
 
 // What a /synced render depends on, for api.syncedVideoUrl: the clip's song,
-// the alignment it plays at, and which render.
-export function renderParams(clip, sound, layout) {
+// the alignment it plays at, which render, and the saved edits to both
+// videos (`song` is the clip's Reference).
+export function renderParams(song, clip, sound, layout) {
   const alignment = effectiveAlignment(clip);
   return {
     reference_id: clip.reference_id,
@@ -54,6 +57,7 @@ export function renderParams(clip, sound, layout) {
     offset_sec: alignment.offset_sec,
     layout,
     sound,
+    edits: editsKey(song, clip),
   };
 }
 
@@ -87,16 +91,25 @@ export function referenceTimeFor(takeSec, offsetSec) {
 
 // Playing the raw take in the browser uses the timing dancesync/sync.py
 // renders with (see its module docstring, invariant 6). Output time T is what
-// the play bar shows, 0 to the take's length × rate. At T the raw take is at
-// clip time T / rate, playing at 1 / rate (a 0.75× take plays at 1.333×),
-// and the song is at offsetSec + T (referenceTimeFor), playing at 1. These
-// two are the browser's only conversions between clip and output time.
-export function clipTimeFor(outputSec, rate) {
-  return outputSec / rate;
+// the play bar shows, 0 to the kept length × rate. At T the raw take is at
+// clip time startSec + T / rate, playing at 1 / rate (a 0.75× take plays at
+// 1.333×), and the song is at offsetSec + T (referenceTimeFor), playing at 1.
+// `startSec` is where a trimmed take starts (trimmedOffset moves offsetSec to
+// match), and 0 when it isn't trimmed. These two are the browser's only
+// conversions between clip and output time.
+export function clipTimeFor(outputSec, rate, startSec = 0) {
+  return startSec + outputSec / rate;
 }
 
-export function outputTimeFor(clipSec, rate) {
-  return clipSec * rate;
+export function outputTimeFor(clipSec, rate, startSec = 0) {
+  return (clipSec - startSec) * rate;
+}
+
+// Where in the song a take trimmed to start at clip time `trimStartSec`
+// begins: that moment heard offsetSec + trimStartSec × rate. The browser's
+// copy of dancesync/sync.py's trimmed_offset. Never saved as the alignment.
+export function trimmedOffset(offsetSec, rate, trimStartSec) {
+  return offsetSec + trimStartSec * rate;
 }
 
 // Wide enough to show the reference and the take side by side by default.

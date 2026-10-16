@@ -89,6 +89,8 @@ Leave both terminals open while you use the app. Errors from the server show up 
 3. **Which part did you dance?** You only see this screen if the song has repeated sections that sound alike. Play each candidate and pick yours.
 4. **Watch:** the synced take plays next to the reference, straight away. Switch between the song and the room sound, slow it down, pick a layout, or download the video (the download is made when you ask for it, and takes about as long as the clip). If it's slightly out of sync, open **Fine-tune**: nudge the offset (or the practice speed, if it drifts), and pick **Both** under Sound to hear the song and the room together; they sound like one when they line up.
 
+To get the two dancers the same size, press **Adjust** under either video: drag the box to crop to the dancer, and **Mirror** or **Rotate** if needed. The song's framing is kept for every take of it. Under your take, **Set start here** and **Set end here** trim off the walk to and from the phone. Downloads come out exactly as the preview looks.
+
 If DanceSync can't find your take in the song at all, you can place it by hand: drag to roughly where it starts, then fine-tune by ear.
 
 Songs you've uploaded stay in the list the next time you start the app.

@@ -87,6 +87,25 @@ export function clearManualAlignment(clipId) {
   return request(`/api/clips/${clipId}/manual`, { method: "DELETE" });
 }
 
+// How the song's video is shown under every take: { rotate, crop, mirror }.
+// Resolves to the Reference.
+export function setReferenceFraming(referenceId, framing) {
+  return request(`/api/references/${referenceId}/framing`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(framing),
+  });
+}
+
+// The take's own framing and trim (null for none). Resolves to the Clip.
+export function setClipEdits(clipId, { framing, trim }) {
+  return request(`/api/clips/${clipId}/edits`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ framing, trim }),
+  });
+}
+
 // The take exactly as it was uploaded, for playing on Watch without a render.
 export function clipMediaUrl(clipId) {
   return `/api/clips/${clipId}/media`;
@@ -101,7 +120,7 @@ export function referenceMediaUrl(referenceId) {
 // path. Mirrors the server's RenderParams, and tests/test_render_params.py
 // fails if the two drift. Every field goes in the URL, so a render that
 // changes never replays from the browser's cache (invariant 7).
-export const RENDER_PARAM_FIELDS = ["reference_id", "rate", "offset_sec", "layout", "sound"];
+export const RENDER_PARAM_FIELDS = ["reference_id", "rate", "offset_sec", "layout", "sound", "edits"];
 
 // `renderParams` comes from flow.renderParams. The server reads `sound` and
 // `layout` from the query and the alignment from its own catalog.

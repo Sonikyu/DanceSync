@@ -72,7 +72,7 @@ def test_rendering_past_the_cap_evicts_and_rerenders(client, monkeypatch, tmp_pa
     clip_id = upload_clip(client, reference["id"], clip.audio)["id"]
     renders = []
 
-    def fake_sync_clip(clip_path, reference_path, params, out_path):
+    def fake_sync_clip(clip_path, reference_path, params, edits, out_path):
         if out_path.exists():
             return False
         renders.append((params.sound, params.layout))

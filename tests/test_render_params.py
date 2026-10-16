@@ -14,7 +14,8 @@ from server.models import RenderParams, render_cache_id
 API_JS = Path(__file__).resolve().parent.parent / "web" / "src" / "api.js"
 
 PARAMS = RenderParams(
-    clip_id="clip", reference_id="ref", rate=0.75, offset_sec=12.25, layout="take", sound="song"
+    clip_id="clip", reference_id="ref", rate=0.75, offset_sec=12.25, layout="take", sound="song",
+    edits="011f920edf46",
 )
 
 # One different value per field, to prove each one reaches the cache id.
@@ -25,6 +26,7 @@ CHANGED = {
     "offset_sec": 12.2501,
     "layout": "side-by-side",
     "sound": "room",
+    "edits": "5d1e0c3a9b27",
 }
 
 
@@ -52,4 +54,4 @@ def test_every_field_changes_the_cache_id(field):
 
 
 def test_cache_id_reads_like_the_inputs():
-    assert render_cache_id(PARAMS) == "clip-ref-0.75-12.25-take-song"
+    assert render_cache_id(PARAMS) == "clip-ref-0.75-12.25-take-song-011f920edf46"

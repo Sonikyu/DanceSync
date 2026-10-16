@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { RENDER_PARAM_FIELDS, importReference, syncedVideoUrl } from "./api.js";
 
-const PARAMS = { reference_id: "ref", rate: 0.75, offset_sec: 12.25, layout: "take", sound: "song" };
+const PARAMS = { reference_id: "ref", rate: 0.75, offset_sec: 12.25, layout: "take", sound: "song", edits: "0a1b2c3d" };
 
 describe("synced video URL", () => {
   test("names the clip in the path and every render param in the query", () => {
@@ -9,7 +9,7 @@ describe("synced video URL", () => {
     expect(url.pathname).toBe("/api/clips/clip/synced");
     expect([...url.searchParams.keys()]).toEqual(RENDER_PARAM_FIELDS);
     expect(Object.fromEntries(url.searchParams)).toEqual({
-      reference_id: "ref", rate: "0.75", offset_sec: "12.25", layout: "take", sound: "song",
+      reference_id: "ref", rate: "0.75", offset_sec: "12.25", layout: "take", sound: "song", edits: "0a1b2c3d",
     });
   });
 

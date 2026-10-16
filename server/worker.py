@@ -12,7 +12,7 @@ from pathlib import Path
 
 from dancesync import audio, matcher, sync
 from dancesync.config import MIN_CLIP_SEC
-from dancesync.types import MatchResult
+from dancesync.types import Edits, MatchResult
 from server.models import RenderParams
 
 
@@ -33,16 +33,26 @@ def align_clip(clip_path: Path, reference_path: Path, reference_id: str) -> Matc
     return matcher.match(clip_audio, ref_audio, ref_features=ref_features)
 
 
-def sync_clip(clip_path: Path, reference_path: Path, params: RenderParams, out_path: Path) -> bool:
+def clip_duration_sec(clip_path: Path) -> float:
+    """From the decoded audio, which is cached from alignment."""
+    return audio.duration_sec(audio.decode(clip_path))
+
+
+def sync_clip(
+    clip_path: Path, reference_path: Path, params: RenderParams, edits: Edits, out_path: Path
+) -> bool:
     """Render the synced video unless an earlier request already did, and
     say whether it rendered. The caller names `out_path` after `params`
-    (`render_cache_id`), so an existing file is never stale."""
+    (`render_cache_id`), whose `edits` field is a hash of `edits`, so an
+    existing file is never stale."""
     if out_path.exists():
         return False
     if params.layout == "take":
-        sync.render_synced(clip_path, reference_path, params.rate, params.offset_sec, out_path, params.sound)
+        sync.render_synced(
+            clip_path, reference_path, params.rate, params.offset_sec, out_path, params.sound, edits
+        )
     else:
         sync.render_compare(
-            clip_path, reference_path, params.rate, params.offset_sec, out_path, params.layout, params.sound
+            clip_path, reference_path, params.rate, params.offset_sec, out_path, params.layout, params.sound, edits
         )
     return True
