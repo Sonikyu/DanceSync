@@ -19,6 +19,7 @@ YouTube also blocks many datacenter IP addresses with "confirm you're not a bot"
 - **Run `yt-dlp` as a subprocess, the same way we run ffmpeg,** rather than importing it as a Python library.
   - Call it as `[sys.executable, "-m", "yt_dlp", …]` instead of relying on `PATH`. That way the server always uses the venv's copy, and `pip install -U yt-dlp` updates it.
   - Add `yt-dlp` to `pyproject.toml`. YouTube changes break it every few weeks, so updating it is a documented chore.
+  - As built: the dependency is `yt-dlp[default]`, which brings `yt-dlp-ejs`. Since late 2025 yt-dlp also needs a JavaScript runtime for YouTube, so the Docker image ships Deno.
   - It merges video and audio streams with ffmpeg, which we already require.
 - **Accept only YouTube URLs:** `youtube.com/watch`, `youtube.com/shorts`, `m.youtube.com`, and `youtu.be`. Check the host before calling yt-dlp. yt-dlp supports thousands of sites plus plain HTTP, so without an allowlist the server would fetch whatever URL it's given. Other sites such as TikTok or Instagram can be added later, one allowlist entry each.
 - **Check the metadata before downloading.** `yt-dlp -J --no-playlist` fetches metadata without downloading anything.

@@ -28,10 +28,18 @@ class Candidate(BaseModel):
 
 
 class Reference(BaseModel):
+    """`source_url` is the YouTube watch URL an imported song came from, and
+    None for an upload. Records saved before imports existed load as uploads."""
+
     id: str
     filename: str
     duration_sec: float
     created_at: datetime
+    source_url: str | None = None
+
+
+class ImportRequest(BaseModel):
+    url: str
 
 
 class ManualAlignment(BaseModel):

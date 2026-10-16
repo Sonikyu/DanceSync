@@ -12,6 +12,15 @@ const MESSAGES = {
   415: "That file type isn't supported. Use a video (.mp4, .mov) or audio file (.mp3, .m4a, .wav).",
 };
 
+// The same statuses mean something else for a YouTube import.
+const IMPORT_MESSAGES = {
+  ...MESSAGES,
+  400: "That's not a link to a YouTube video. Copy the link from the video's Share button.",
+  413: "That video's too long or too big to import. Use one under 15 minutes, or upload the file instead.",
+  422: "Couldn't download that video. It may be private, age-restricted, or live. Try another link, or upload the file instead.",
+  503: "YouTube import isn't set up on this server. Upload the file instead.",
+};
+
 // `{ signed_in }`. Always true when the server has no passphrase set.
 export function getSession() {
   return request("/api/session");
@@ -37,6 +46,17 @@ export function listReferences() {
 
 export function uploadReference(file, onProgress) {
   return upload("/api/references", file, onProgress);
+}
+
+// Downloads the video on the server and resolves to a Reference, the same as
+// an upload. A link imported before resolves to the existing one.
+export function importReference(url) {
+  const options = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  };
+  return request("/api/references/import", options, IMPORT_MESSAGES);
 }
 
 export function uploadClip(referenceId, file, onProgress) {
@@ -103,11 +123,11 @@ export async function renderSynced(url) {
   if (!resp.ok) throw new Error("Couldn't make that video. Try again, or try another take.");
 }
 
-async function request(url, options) {
+async function request(url, options, messages = MESSAGES) {
   const resp = await fetch(url, options).catch(() => {
     throw new Error(UNREACHABLE);
   });
-  return parseResponse(resp.status, await resp.text());
+  return parseResponse(resp.status, await resp.text(), messages);
 }
 
 // XMLHttpRequest rather than fetch: fetch can't report upload progress, and a
@@ -125,17 +145,17 @@ function upload(url, file, onProgress) {
   }).then((xhr) => parseResponse(xhr.status, xhr.responseText));
 }
 
-function parseResponse(status, text) {
+function parseResponse(status, text, messages = MESSAGES) {
   if (status < 400) return JSON.parse(text);
-  throw new Error(errorMessage(status, text));
+  throw new Error(errorMessage(status, text, messages));
 }
 
 // Most errors get a fixed message by status. A too-short clip gets one with
 // its own numbers, from the server's structured `detail`.
-function errorMessage(status, text) {
+function errorMessage(status, text, messages) {
   const detail = errorDetail(text);
   if (detail?.error === "clip_too_short") return clipTooShortMessage(detail.duration_sec, detail.min_sec);
-  return MESSAGES[status] ?? "Something went wrong on the server. Try again.";
+  return messages[status] ?? "Something went wrong on the server. Try again.";
 }
 
 function errorDetail(text) {

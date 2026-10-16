@@ -10,6 +10,10 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
     "python-multipart>=0.0.9",
+    # YouTube import. YouTube breaks yt-dlp every few weeks; updating it is
+    # a chore: pip install -U 'yt-dlp[default]'. [default] brings yt-dlp-ejs,
+    # which YouTube needs along with a JavaScript runtime (Deno).
+    "yt-dlp[default]>=2025.11.12",
 ]
 
 [project.optional-dependencies]
@@ -27,3 +31,6 @@ include = ["dancesync*", "server*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Tests that reach the internet run only when asked for: pytest -m network
+addopts = "-m 'not network'"
+markers = ["network: needs the internet; skipped unless run with -m network"]

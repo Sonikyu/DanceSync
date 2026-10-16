@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 DanceSync is a dance practice tool. Dancers record themselves practicing to slowed-down music, typically at 0.75x on a laptop speaker, filmed on a phone. The app syncs the video to the original-speed reference track, so dancers can review their practice at full tempo, in time with the music and next to the original choreography.
 
-**Status:** The MVP is built. That covers the production matcher (`dancesync/`), the FastAPI backend (`server/`), the ffmpeg sync engine, and the React web UI (`web/`). Phase 5's MVP items (CI, error cases, Docker, access control) and post-MVP features 1–4 (instant preview, review speed, manual alignment, layouts) are done too. What remains is tracked in `next-steps.md`; each feature has its own spec in `specs/`, broken into tickets in `tickets/`. The spike in `spike/` validated the alignment premise on both synthetic (Tier A) and real-world (Tier B) recordings.
+**Status:** The MVP is built. That covers the production matcher (`dancesync/`), the FastAPI backend (`server/`), the ffmpeg sync engine, and the React web UI (`web/`). Phase 5's MVP items (CI, error cases, Docker, access control) and post-MVP features 1–5 (instant preview, review speed, manual alignment, layouts, YouTube import) are done too. What remains is tracked in `next-steps.md`; each feature has its own spec in `specs/`, broken into tickets in `tickets/`. The spike in `spike/` validated the alignment premise on both synthetic (Tier A) and real-world (Tier B) recordings.
 
 **Audience:** The owner and friends. It runs locally or self-hosted; it is not a public site.
 
@@ -24,11 +24,12 @@ DanceSync/
 │   └── ffmpeg.py             # how to run ffmpeg: presence check, probe, encoder args, atomic writes
 ├── server/                   # FastAPI app
 │   ├── main.py               # app, CORS, routers
-│   ├── routes/               # session (sign-in), references, clips, align (candidate select, manual alignment), synced
+│   ├── routes/               # session (sign-in), references (upload, YouTube import), clips, align (candidate select, manual alignment), synced
 │   ├── models.py             # Pydantic request/response bodies + persisted records
 │   ├── storage.py            # raw bytes on disk, keyed by content hash
 │   ├── catalog.py            # JSON metadata records (kept separate from storage)
 │   ├── worker.py             # align_clip / sync_clip (synchronous for now)
+│   ├── youtube.py            # YouTube import: link allowlist, yt-dlp metadata probe and download
 │   ├── render_cache.py       # LRU cap on rendered videos (mtime = last served); swept after each new render
 │   ├── auth.py               # shared-passphrase sign-in: session cookie + middleware (off when unset)
 │   ├── web.py                # serves the built web/dist at / (when it exists), behind /api
@@ -62,6 +63,7 @@ npm --prefix web run dev                              # UI on :5173, proxies /ap
 
 .venv/bin/python -m pytest                            # full suite, a few minutes (renders real video)
 .venv/bin/python -m pytest tests/test_matcher.py      # Tier A regression only
+.venv/bin/python -m pytest -m network                 # the tests that reach the internet (a real YouTube import)
 npm --prefix web test                                 # Vitest
 
 docker compose up -d --build                          # production-style: one container on :8000, API + built web app
@@ -108,6 +110,7 @@ docker compose up -d --build                          # production-style: one co
 - **`peak_ratio` can be infinite** when nothing competes with the winner. The API sends it as `null`.
 - **With `DANCESYNC_PASSPHRASE` set, every `/api` call needs the session cookie.** `<video>`/`<audio>` send it on range requests because everything is same-origin; a cross-origin frontend would need credentialed CORS.
 - **Playwright's bundled Chromium can't decode H.264 or AAC,** so it can't play the app's MP4 renders or a phone's upload. To test playback in it, serve VP9/Opus WebM transcodes of the same media with `page.route`, including byte ranges (without them nothing can seek). As a side effect, a raw MP4 take exercises the render fallback for real.
+- **yt-dlp runs on a URL rebuilt from the video id,** never the pasted one, so the host allowlist in `server/youtube.py` is the only way in. YouTube breaks yt-dlp every few weeks, and it needs a JavaScript runtime (Deno) for YouTube; `pip install -U 'yt-dlp[default]'` is the fix when imports start failing.
 - **The full pytest run takes a few minutes,** because the sync tests render real video. librosa's "empty frequency set" warnings on synthetic audio are expected.
 
 ## Coding style
