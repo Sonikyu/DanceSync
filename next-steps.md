@@ -31,6 +31,23 @@ A dancer practices to music played at reduced speed (typically 0.75x) on a lapto
 | 5. Polish & deploy | MVP items done (CI, error cases, Docker, access control), plus the render cache cap and the hosting runbook. Left: job queue with progress, benchmark harness |
 | Post-MVP features | 1–6 done (instant preview, review speed, manual alignment, layouts, YouTube import, video editing); 7–9 specced in [`specs/`](specs/) |
 
+### Checks still owed
+
+The code for these is merged and tested, but each one needs a real device or a real server that CI doesn't have:
+
+- **Instant preview on real browsers** (DS-19): play a phone's take on Watch in iPhone Safari, desktop Safari, Chrome, and Firefox, including an HEVC take that should fall back to a render.
+- **YouTube import from a VPS** (DS-31): datacenter IPs are often blocked with "confirm you're not a bot". Record the result in [`docs/hosting.md`](docs/hosting.md#youtube-import-from-this-host).
+- **The crop box on a phone's touchscreen** (DS-38).
+
+### What's next
+
+Pick by what hurts most:
+
+1. **Practice speeds** (feature 7, DS-40–DS-45) if anyone practices at speeds other than full, ¾, and ½. Today those takes need the speed set by hand in Fine-tune.
+2. **Job queue and progress** (DS-13, DS-14) before hosting behind a proxy with a short timeout, and before follow dancer. Today an upload blocks for 10–30 s with no progress, and a long render blocks its request.
+3. **Benchmark harness** (DS-11) before any more matcher changes.
+4. **Managed hosting on Render** (feature 9) if running a VPS is more upkeep than the group wants.
+
 Invariant 7 (render cache names) is enforced by one `RenderParams` record shared by the server's cache id and the browser's URL, with a test that fails if they drift (DS-03).
 
 pytest covers the Tier A matcher regression, the ambiguity threshold, the API routes, and real ffmpeg renders. Vitest covers the UI's pure helpers in `web/src/flow.js`, `web/src/tuning.js` and `web/src/editing.js`, and `api.js`'s URL building.
@@ -60,7 +77,8 @@ Endpoints:
 - `POST /api/references`, `POST /api/references/import` (a YouTube link; post-MVP), `GET /api/references`, `GET /api/references/{id}/media`
 - `PUT /api/references/{id}/framing` (crop, mirror, rotate for the song's video; post-MVP)
 - `POST /api/clips`, `GET /api/clips/{id}`, `GET /api/clips/{id}/media` (the uploaded take, with range requests; for instant preview), `POST /api/clips/{id}/select`, `PUT|DELETE /api/clips/{id}/manual` (an alignment set by hand; post-MVP), `PUT /api/clips/{id}/edits` (the take's framing and trim; post-MVP)
-- `GET|HEAD /api/clips/{id}/synced?sound=song|room&layout=take|side-by-side|stacked`
+- `GET|HEAD /api/clips/{id}/synced?sound=song|room&layout=take|side-by-side|stacked` (the URL also carries the alignment and a hash of the edits, so a changed input never serves a stale render)
+- `GET|POST /api/session` (sign-in status and sign-in, when a passphrase is set; Phase 5)
 
 ### Phase 3 — Video sync engine (`dancesync/sync.py`, `dancesync/ffmpeg.py`)
 
@@ -78,10 +96,11 @@ Built with React 19, Vite, and plain CSS, and no other runtime dependencies. Vit
 
 - **Step flow:** Song → Video → Match (only when ambiguous) → Watch.
 - **Match screen:** changed from the plan. A song timeline with candidate markers and 8 s audio previews replaced the score-curve plot and video thumbnails.
-- **Watch screen:**
-  - The take and the reference share one play bar. The take sets the time, and the reference follows it by nudging its `playbackRate` (`useLinkedPlayback.js`).
-  - The screen also has the Song/Room toggle and the download buttons.
-- **Pure helpers** live in `web/src/flow.js`, with Vitest tests.
+- **Watch screen:** built as a rendered video at first; instant preview (post-MVP) replaced that. Now:
+  - The browser plays the uploaded take and the reference on one play bar. Whichever element makes the sound is the clock, and the muted one follows by nudging its `playbackRate` (`useLinkedPlayback.js`).
+  - If the browser can't decode the take (HEVC in Firefox, for one), it plays a server render instead.
+  - Sound, review speed, layout, Fine-tune, Adjust, and one Download button that renders what's on screen.
+- **Pure helpers** live in `web/src/flow.js`, `tuning.js` (fine-tuning, placing by hand), and `editing.js` (Adjust), with Vitest tests.
 
 ---
 
@@ -89,19 +108,19 @@ Built with React 19, Vite, and plain CSS, and no other runtime dependencies. Vit
 
 Ticketed as three separate tracks — Ship (what's left before the MVP is done), Operate, and Platform. See [`tickets/README.md`](tickets/README.md).
 
-- **Tests in CI (MVP):** done. `.github/workflows/test.yml` runs `pytest` and `npm --prefix web test` on every PR.
-- **Error cases (MVP):** friendly messages already exist for files that are too big, unsupported file types, and an unreachable server. Still needed:
-  - ~~clips too short to match~~ (done: `MIN_CLIP_SEC` = 10 s, measured; the upload answers 422 with the clip's length)
-  - ~~no strong peak anywhere~~ (done: `MIN_MATCH_SCORE` = 3.5, measured; `AlignmentResult.failed` and a "couldn't find this take" screen that leads to placing the take by hand ([manual-alignment](specs/manual-alignment.md), DS-26), with a "watch anyway" escape).
-  - ~~a startup check that stops the server if ffmpeg is missing~~ (done)
+- **Tests in CI (MVP):** done. `.github/workflows/test.yml` runs `pytest`, `npm --prefix web test`, and a web build on every PR and on pushes to `main`. Tests that need the internet (a real YouTube import) are marked `network` and run only with `pytest -m network`.
+- **Error cases (MVP):** done. Friendly messages for files that are too big, unsupported file types, an unreachable server, and failed YouTube imports, plus:
+  - clips too short to match: `MIN_CLIP_SEC` = 10 s, measured; the upload answers 422 with the clip's length.
+  - no strong peak anywhere: `MIN_MATCH_SCORE` = 3.5, measured; `AlignmentResult.failed` and a "couldn't find this take" screen that leads to placing the take by hand ([manual-alignment](specs/manual-alignment.md), DS-26), with a "watch anyway" escape.
+  - a startup check that stops the server if ffmpeg is missing.
 - **One-command run (MVP):** done. A multi-stage `Dockerfile` (Node builds `web/dist`, Python 3.11 slim with ffmpeg runs it), FastAPI serving that build from the API's origin (`server/web.py`), and `docker compose up` with named volumes for data and cache. Settings come from `DANCESYNC_*` env vars (`.env.example`).
 - **Access control:** done. Set `DANCESYNC_PASSPHRASE` and every `/api` request needs the cookie from `POST /api/session`; the web app shows a sign-in screen. Unset means no sign-in, as before.
 - **Render cleanup:** done. Renders are capped at `DANCESYNC_RENDER_CACHE_GB` (5 GB by default); after each new render, the least recently served ones are deleted (`server/render_cache.py`) and re-rendered on demand.
-- **Background jobs and progress:** move alignment and rendering to a job queue that reports progress over server-sent events (SSE). Needed for:
+- **Background jobs and progress (not started, DS-13, DS-14):** move alignment and rendering to a job queue that reports progress over server-sent events (SSE). Needed for:
   - [follow-dancer](specs/follow-dancer.md), where tracking takes minutes
   - any reverse proxy with a 60 s timeout in front of a long render
-- **Hosting:** runbook in [`docs/hosting.md`](docs/hosting.md): a small VPS with Docker and Caddy (600 s proxy timeouts, from measured render times), or a home machine over Tailscale. The YouTube-from-this-host test waits until YouTube import exists.
-- **Benchmark harness:** real-world clips with known correct offsets, run in CI to catch matcher regressions.
+- **Hosting:** runbook in [`docs/hosting.md`](docs/hosting.md): a small VPS with Docker and Caddy (600 s proxy timeouts, from measured render times), or a home machine over Tailscale. Trying a YouTube import from the VPS is still owed (see [Checks still owed](#checks-still-owed)).
+- **Benchmark harness (not started, DS-11):** real-world clips with known correct offsets, run in CI to catch matcher regressions.
 - **Deferred: cloud storage (S3/GCS).** A self-hosted deployment for the owner and friends doesn't need it. `server/storage.py` stays separate so it can be swapped in later.
 
 ---

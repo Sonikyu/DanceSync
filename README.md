@@ -6,11 +6,27 @@ A dancer plays a song at reduced speed (say 0.75×) on a laptop and films themse
 
 > **Two ways to run it:** from source on your own computer (below), or as a single Docker container that you can also host on a server ([Running it with Docker](#running-it-with-docker)).
 
+## What it can do today
+
+| | Supported |
+|---|---|
+| **Song** | An audio file (MP3, M4A, WAV, …) or a video of the choreography (MP4, MOV), up to 100 MB. Or a YouTube link, up to 15 minutes and 300 MB; not private, age-restricted, or live videos. |
+| **Practice video** | Any video ffmpeg can read (a phone's MOV or MP4, HEVC included), at least 10 seconds long and up to 500 MB. |
+| **Practice speeds** | Found automatically at full, ¾, or ½ speed. Any other speed from 0.25× to 1× can be set by hand in Fine-tune. |
+| **Repeated choruses** | When two parts of the song sound alike, you pick yours from the top three. |
+| **No match** | Place the take on the song's timeline by hand, then fine-tune by ear. |
+| **Watch** | Plays straight away, no rendering. Sound: the song, the room, or both (while fine-tuning). Review speed: 0.5×, 0.75×, or 1×. Layout: side by side, stacked, or take only. |
+| **Edits** | Crop, mirror, and rotate either video; trim the start and end of the take. The song's framing is kept for every take of it. |
+| **Download** | An MP4 of exactly what's on screen (layout, sound, edits), made on demand at full speed. |
+| **Sharing** | One shared passphrase for the owner and friends. No separate accounts. |
+
+**Not yet:** practice speeds other than full, ¾, and ½ found automatically, progress bars for long uploads and renders, and following one dancer in a group video. See [next-steps.md](next-steps.md).
+
 ## How it works
 
 1. **Match** (`dancesync/matcher.py`): the phone's audio is compared against the reference at each candidate playback rate, using chroma features. When a repeated chorus makes the answer ambiguous, the user picks from the top three candidates.
 2. **Review** (`web/`): the browser plays the uploaded video sped up by `1/rate`, next to the reference video and in time with the song, so it's ready the moment the match is. The two are kept in step by nudging the silent one's playback speed.
-3. **Render on download** (`dancesync/sync.py`): one ffmpeg command speeds the video up by `1/rate` and lays the reference audio underneath, starting from the matched point, with the same timing the browser uses.
+3. **Render on download** (`dancesync/sync.py`): one ffmpeg command speeds the video up by `1/rate`, applies the crop, mirror, rotate, and trim, puts it beside or under the reference video if asked, and lays the chosen sound underneath, starting from the matched point, with the same timing the browser uses.
 
 ---
 
@@ -31,6 +47,7 @@ These steps assume macOS with [Homebrew](https://brew.sh).
 
 ```bash
 brew install node ffmpeg
+brew install deno          # optional: only needed to import songs from YouTube links
 ```
 
 Check the versions:
@@ -165,7 +182,42 @@ rm -rf .data/server .cache/dancesync
 DANCESYNC_API_URL=http://localhost:8001 npm --prefix web run dev
 ```
 
+**Running it as one process, without Docker** (what the container does): build the web app once, and the API serves it at http://localhost:8000. No second terminal needed, but rebuild after pulling new code.
+
+```bash
+npm --prefix web run build
+.venv/bin/uvicorn server.main:app --port 8000
+```
+
+**Requiring a passphrase locally:** start the API with `DANCESYNC_PASSPHRASE=… .venv/bin/uvicorn server.main:app --port 8000`. The web app then shows a sign-in screen.
+
+**Updating yt-dlp** when YouTube imports start failing (YouTube breaks it every few weeks):
+
+```bash
+.venv/bin/pip install -U 'yt-dlp[default]'
+```
+
 **Poking at the API directly:** http://localhost:8000/docs lists every endpoint and lets you call them from the browser.
+
+---
+
+## Settings
+
+Every setting is optional and comes from an environment variable. With Docker, put them in `.env` (see `.env.example`); from source, put them in front of the `uvicorn` command.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `DANCESYNC_PASSPHRASE` | unset (no sign-in) | Shared passphrase. Set it before the app is reachable from the internet. Changing it signs everyone out. |
+| `DANCESYNC_PORT` | `8000` | Docker only: the host port. `127.0.0.1:8000` keeps it private behind a reverse proxy. |
+| `DANCESYNC_MAX_REFERENCE_MB` | `100` | Largest song upload. |
+| `DANCESYNC_MAX_CLIP_MB` | `500` | Largest practice video upload. |
+| `DANCESYNC_MAX_IMPORT_MB` | `300` | Largest YouTube import. |
+| `DANCESYNC_RENDER_CACHE_GB` | `5` | Rendered videos past this size are deleted, least recently watched first, and re-rendered on demand. |
+| `DANCESYNC_STORAGE_ROOT` | `.data/server` | Where uploads, their metadata, and renders go (`/data` in Docker). |
+| `DANCESYNC_CACHE_DIR` | `.cache/dancesync` | Where decoded audio and song features go (`/cache` in Docker). Safe to delete. |
+| `DANCESYNC_CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Origins allowed to call the API from another site. Not needed for the web app this repo serves. |
+| `DANCESYNC_WEB_DIST` | `web/dist` | The built web app, served at `/` when it exists. |
+| `DANCESYNC_API_URL` | `http://localhost:8000` | Vite dev server only: where it forwards `/api`. |
 
 ---
 
@@ -180,6 +232,8 @@ DANCESYNC_API_URL=http://localhost:8001 npm --prefix web run dev
 | "Couldn't make that video." | The render failed, and terminal 1 only logs a `422` line. To see ffmpeg's actual error, open your browser's developer tools, go to the Network tab, find the failed `synced?…` request, and open its URL in a new tab. The usual causes are a missing ffmpeg or a corrupt file. |
 | `[Errno 48] Address already in use` | Something else is on port 8000, often an API server you left running. Find it with `lsof -i :8000`, or use another port (see above). |
 | `ModuleNotFoundError` when starting the API | Run the `pip install` line from step 2 again. Make sure the command starts with `.venv/bin/`. |
+| "YouTube import isn't set up on this server." | yt-dlp isn't installed. Run the `pip install` line from step 2 again. |
+| "Couldn't download that video." | The video is private, age-restricted, or live, or YouTube changed something. Update yt-dlp (see Everyday tasks), and check that `deno --version` works. If terminal 1 says "confirm you're not a bot", YouTube is blocking that machine's IP; download the video another way and upload the file. |
 | Vite refuses to start and mentions the Node version | Upgrade Node: `brew upgrade node`. |
 | The phone can't load the page | Check that you started the web app with `-- --host`, that the phone is on the same Wi-Fi, and that you're using the numeric `Network:` address. |
 
@@ -188,15 +242,18 @@ DANCESYNC_API_URL=http://localhost:8001 npm --prefix web run dev
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest     # a few minutes, because it renders real video
+.venv/bin/python -m pytest              # a few minutes, because it renders real video
+.venv/bin/python -m pytest -m network   # the tests that need the internet (a real YouTube import)
 npm --prefix web test
 ```
+
+CI runs pytest, Vitest, and a web build on every pull request.
 
 ## Project layout
 
 ```
 dancesync/   matcher + sync engine (Python library, no web code)
-server/      FastAPI app: upload, align, select, render
+server/      FastAPI app: sign-in, upload, YouTube import, align, edits, render
 web/         React + Vite frontend
 tests/       pytest: Tier A matcher regression, API, renders
 docs/        hosting runbook
