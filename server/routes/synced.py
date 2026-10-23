@@ -1,6 +1,6 @@
 """GET /api/clips/{id}/synced -- the practice video re-timed to original speed,
 alone or side by side with the reference video, under the song or under the
-phone's own recording."""
+phone's own recording, with the dancer's edits applied."""
 
 from __future__ import annotations
 
@@ -14,7 +14,15 @@ from dancesync.sync import Sound
 from server import config, render_cache
 from server.catalog import Catalog
 from server.deps import get_catalog, get_storage
-from server.models import Clip, Layout, RenderParams, effective_alignment, render_cache_id
+from server.models import (
+    Clip,
+    Layout,
+    RenderParams,
+    edits_for,
+    edits_key,
+    effective_alignment,
+    render_cache_id,
+)
 from server.storage import LocalStorage
 from server.worker import sync_clip
 
@@ -42,14 +50,15 @@ def download_synced(
     if reference is None:
         raise HTTPException(404, f"no reference with id {clip.reference_id}")
 
-    params = _render_params(clip, sound, layout)
+    edits = edits_for(reference, clip)
+    params = _render_params(clip, edits_key(edits), sound, layout)
     clip_path = storage.path_for("clips", clip.id, Path(clip.filename).suffix.lower())
     reference_suffix = Path(reference.filename).suffix.lower()
     reference_path = storage.path_for("references", reference.id, reference_suffix)
     out_path = storage.path_for("synced", render_cache_id(params), ".mp4")
 
     try:
-        rendered = sync_clip(clip_path, reference_path, params, out_path)
+        rendered = sync_clip(clip_path, reference_path, params, edits, out_path)
     except SyncError as exc:
         raise HTTPException(422, str(exc)) from exc
 
@@ -60,10 +69,10 @@ def download_synced(
     return FileResponse(out_path, media_type="video/mp4", filename=_download_name(clip, params))
 
 
-def _render_params(clip: Clip, sound: Sound, layout: Layout) -> RenderParams:
-    """What this request renders, at the clip's effective alignment. The
-    alignment comes from the catalog, not the URL: the browser's copy of it
-    only keeps its own cache honest."""
+def _render_params(clip: Clip, edits: str, sound: Sound, layout: Layout) -> RenderParams:
+    """What this request renders, at the clip's effective alignment, with
+    `edits` (an `edits_key`). The alignment and edits come from the catalog,
+    not the URL: the browser's copies only keep its own cache honest."""
     alignment = effective_alignment(clip.alignment)
     return RenderParams(
         clip_id=clip.id,
@@ -72,6 +81,7 @@ def _render_params(clip: Clip, sound: Sound, layout: Layout) -> RenderParams:
         offset_sec=alignment.offset_sec,
         layout=layout,
         sound=sound,
+        edits=edits,
     )
 
 

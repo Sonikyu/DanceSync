@@ -1,9 +1,10 @@
-"""Result types shared across the matcher and its callers."""
+"""Types shared with dancesync's callers: what the matcher found, and the
+edits a render applies to the reference and the take."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Literal, Optional
 
 
 @dataclass(frozen=True)
@@ -54,3 +55,41 @@ class MatchResult:
             if abs(c.offset_sec - true_offset_sec) <= tol_sec:
                 return i
         return None
+
+
+@dataclass(frozen=True)
+class Crop:
+    """Fractions of the rotated, un-mirrored frame: 0..1, origin top-left."""
+
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+@dataclass(frozen=True)
+class Framing:
+    """How one video is shown, applied in this order: rotate (clockwise, a
+    manual override for wrong rotation metadata), crop, mirror."""
+
+    rotate: Literal[0, 90, 180, 270] = 0
+    crop: Optional[Crop] = None
+    mirror: bool = False
+
+
+@dataclass(frozen=True)
+class Trim:
+    """Seconds in the ORIGINAL uploaded clip, before re-timing."""
+
+    start_sec: float
+    end_sec: float
+
+
+@dataclass(frozen=True)
+class Edits:
+    """Everything a render changes about the two videos: each one's framing,
+    and which stretch of the take it keeps (None keeps all of it)."""
+
+    reference_framing: Framing = Framing()
+    take_framing: Framing = Framing()
+    trim: Optional[Trim] = None

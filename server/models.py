@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+from dataclasses import asdict
 from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
 
 from dancesync.sync import Sound
+from dancesync.types import Edits, Framing, Trim
 
 # Which synced render: the take alone, or with the reference video beside it
 # or above it.
@@ -29,13 +33,16 @@ class Candidate(BaseModel):
 
 class Reference(BaseModel):
     """`source_url` is the YouTube watch URL an imported song came from, and
-    None for an upload. Records saved before imports existed load as uploads."""
+    None for an upload. `framing` is set once per song and applies to every
+    take. Records saved before imports or framing existed load as unedited
+    uploads."""
 
     id: str
     filename: str
     duration_sec: float
     created_at: datetime
     source_url: str | None = None
+    framing: Framing = Framing()
 
 
 class ImportRequest(BaseModel):
@@ -67,11 +74,22 @@ class AlignmentResult(BaseModel):
 
 
 class Clip(BaseModel):
+    """`framing` and `trim` change only what a render shows, never the
+    alignment, which always covers the whole take. Records saved before
+    edits existed load unedited."""
+
     id: str
     reference_id: str
     filename: str
     alignment: AlignmentResult
     created_at: datetime
+    framing: Framing = Framing()
+    trim: Trim | None = None
+
+
+class ClipEdits(BaseModel):
+    framing: Framing = Framing()
+    trim: Trim | None = None
 
 
 class SelectCandidateRequest(BaseModel):
@@ -110,6 +128,20 @@ class RenderParams(BaseModel):
     offset_sec: float
     layout: Layout
     sound: Sound
+    edits: str
+
+
+def edits_for(reference: Reference, clip: Clip) -> Edits:
+    return Edits(reference_framing=reference.framing, take_framing=clip.framing, trim=clip.trim)
+
+
+def edits_key(edits: Edits) -> str:
+    """A short hash of every edit, for `RenderParams.edits`: the edits are
+    too long to spell out in a filename. The browser keys its URL on a hash
+    of its own (`editing.editsKey`); the two only need to change whenever
+    an edit does."""
+    edits_json = json.dumps(asdict(edits), sort_keys=True)
+    return hashlib.sha256(edits_json.encode()).hexdigest()[:12]
 
 
 def render_cache_id(params: RenderParams) -> str:

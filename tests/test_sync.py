@@ -16,6 +16,7 @@ import soundfile as sf
 from dancesync import audio, sync
 from dancesync.config import COMPARE_FPS, COMPARE_HEIGHT, COMPARE_WIDTH, SR
 from dancesync.ffmpeg import SyncError
+from dancesync.types import Crop, Edits, Framing, Trim
 from tests.conftest import flash_time_sec, write_flash_video
 
 pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
@@ -278,3 +279,114 @@ def test_stacked_puts_a_landscape_reference_over_the_take(clip_path, tmp_path):
     assert _flash_time_in_sec(out, "top") == pytest.approx(1.5, abs=FRAME_SEC + 0.01)
     assert _flash_time_in_sec(out, "bottom") == pytest.approx(1.5, abs=FRAME_SEC + 0.01)
     assert _click_time_sec(out) == pytest.approx(1.5, abs=0.01)
+
+
+# --- Edits: trim and framing ---------------------------------------------------
+
+
+def test_trimmed_offset_is_where_the_trimmed_start_was_heard():
+    """Clip time 2 s heard reference time 10 + 2 * 0.75 = 11.5 s."""
+    assert sync.trimmed_offset(10.0, 0.75, 2.0) == pytest.approx(11.5)
+    assert sync.trimmed_offset(-1.0, 1.0, 0.0) == -1.0
+
+
+def test_trimmed_take_stays_in_sync_from_its_new_first_frame(clip_path, reference_path, tmp_path):
+    """Trimmed to clip time 1.0-3.5 s, the flash (clip 2.0 s) and the click it
+    heard (reference 11.5 s) both land (2.0 - 1.0) * 0.75 = 0.75 s in, and the
+    output lasts (3.5 - 1.0) * 0.75 s."""
+    out = tmp_path / "synced.mp4"
+    edits = Edits(trim=Trim(1.0, 3.5))
+    sync.render_synced(clip_path, reference_path, rate=0.75, offset_sec=10.0, out_path=out, edits=edits)
+
+    _, duration = _probe(out)
+    assert duration == pytest.approx(2.5 * 0.75, abs=0.05)
+    assert flash_time_sec(out) == pytest.approx(0.75, abs=FRAME_SEC + 0.01)
+    assert _click_time_sec(out) == pytest.approx(0.75, abs=0.01)
+
+
+def test_trimmed_room_sound_is_cut_like_the_video(reference_path, tmp_path):
+    """The phone heard a click at clip time 1.0 s; trimmed from 0.5 s at 0.75x,
+    it lands at 0.375 s."""
+    room = tmp_path / "room.wav"
+    _write_click_reference(room, duration_sec=CLIP_SEC, click_sec=1.0)
+    clip = tmp_path / "practice.mp4"
+    write_flash_video(clip, duration_sec=CLIP_SEC, flash_sec=FLASH_SEC, audio_path=room)
+    out = tmp_path / "synced.mp4"
+    edits = Edits(trim=Trim(0.5, CLIP_SEC))
+    sync.render_synced(clip, reference_path, 0.75, 10.0, out, sound="room", edits=edits)
+
+    assert _click_time_sec(out) == pytest.approx(0.375, abs=0.02)
+    assert flash_time_sec(out) == pytest.approx(1.5 * 0.75, abs=FRAME_SEC + 0.01)
+
+
+def test_take_only_keeps_the_cropped_size_rounded_down_to_even(reference_path, tmp_path):
+    """64x32 turned 90 degrees is 32x64; half its width and 0.3 of its height
+    is 16 x 19.2 pixels, which rounds down to 16x18. No upscaling."""
+    clip = tmp_path / "practice.mp4"
+    write_flash_video(clip, duration_sec=1.0, flash_sec=0.5, size="64x32")
+    out = tmp_path / "synced.mp4"
+    edits = Edits(take_framing=Framing(rotate=90, crop=Crop(x=0.25, y=0.5, w=0.5, h=0.3)))
+    sync.render_synced(clip, reference_path, 1.0, 0.0, out, edits=edits)
+
+    streams, _ = _probe(out)
+    assert (streams["video"]["width"], streams["video"]["height"]) == (16, 18)
+
+
+def _write_marked_video(path, box: str) -> None:
+    """A black 64x64 second with a white box (drawbox x:y:w:h) on it."""
+    source = f"color=c=black:s=64x64:r=30:d=1,drawbox={box}:c=white:t=fill"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", source,
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)],
+        check=True,
+    )
+
+
+def _bright_quadrants(video_path) -> list[list[bool]]:
+    """Which quarters of the first frame are mostly white: [[top-left, top-right], [bottom-left, bottom-right]]."""
+    cmd = [
+        "ffmpeg", "-v", "error", "-i", str(video_path), "-frames:v", "1",
+        "-vf", "scale=2:2:flags=area,format=gray", "-f", "rawvideo", "-",
+    ]
+    luma = np.frombuffer(subprocess.run(cmd, capture_output=True, check=True).stdout, np.uint8)
+    return (luma.reshape(2, 2) > 128).tolist()
+
+
+@pytest.mark.parametrize(
+    ("box", "framing", "bright"),
+    [
+        # White along the top; turned clockwise, the top becomes the right.
+        ("0:0:64:32", Framing(rotate=90), [[False, True], [False, True]]),
+        # White in the right quarter; the right half of the frame is half white.
+        ("48:0:16:64", Framing(crop=Crop(0.5, 0.0, 0.5, 1.0)), [[False, True], [False, True]]),
+        # Mirrored after the crop: the same picture, flipped.
+        ("48:0:16:64", Framing(crop=Crop(0.5, 0.0, 0.5, 1.0), mirror=True), [[True, False], [True, False]]),
+    ],
+)
+def test_framing_moves_the_picture_like_the_preview(reference_path, tmp_path, box, framing, bright):
+    clip = tmp_path / "practice.mp4"
+    _write_marked_video(clip, box)
+    out = tmp_path / "synced.mp4"
+    sync.render_synced(clip, reference_path, 1.0, 0.0, out, edits=Edits(take_framing=framing))
+
+    assert _bright_quadrants(out) == bright
+
+
+def test_compare_frames_each_video_before_fitting_and_trims_the_take(clip_path, tmp_path):
+    """The take cropped to its left half (32x64) is 360x720 once fitted, beside
+    the 720x720 reference. Trimmed from clip time 1.0 s, both flash 0.75 s in."""
+    reference = _write_flash_reference(tmp_path, duration_sec=20.0, flash_sec=11.5)
+    out = tmp_path / "side.mp4"
+    edits = Edits(
+        reference_framing=Framing(mirror=True),
+        take_framing=Framing(crop=Crop(0.0, 0.0, 0.5, 1.0)),
+        trim=Trim(1.0, CLIP_SEC),
+    )
+    sync.render_compare(clip_path, reference, 0.75, 10.0, out, layout="side-by-side", edits=edits)
+
+    streams, duration = _probe(out)
+    assert (streams["video"]["width"], streams["video"]["height"]) == (COMPARE_HEIGHT + 360, COMPARE_HEIGHT)
+    assert duration == pytest.approx(3.0 * 0.75, abs=0.05)
+    assert _flash_time_in_sec(out, "left") == pytest.approx(0.75, abs=FRAME_SEC + 0.01)
+    assert flash_time_sec(out) == pytest.approx(0.75, abs=FRAME_SEC + 0.01)
+    assert _click_time_sec(out) == pytest.approx(0.75, abs=0.01)

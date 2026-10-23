@@ -7,12 +7,12 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from dancesync import audio
 from server import config
 from server.catalog import Catalog
 from server.deps import get_catalog, get_storage
 from server.models import Clip, ManualAlignment, SelectCandidateRequest
 from server.storage import LocalStorage
+from server.worker import clip_duration_sec
 
 router = APIRouter(prefix="/api/clips", tags=["clips"])
 
@@ -49,7 +49,8 @@ def set_manual_alignment(
     clip = _clip_or_404(catalog, clip_id)
     if not config.MIN_MANUAL_RATE <= body.rate <= config.MAX_MANUAL_RATE:
         raise HTTPException(422, f"rate must be {config.MIN_MANUAL_RATE}-{config.MAX_MANUAL_RATE}")
-    min_offset_sec = -_clip_duration_sec(storage, clip)
+    clip_path = storage.path_for("clips", clip.id, Path(clip.filename).suffix.lower())
+    min_offset_sec = -clip_duration_sec(clip_path)
     max_offset_sec = catalog.get_reference(clip.reference_id).duration_sec
     if not min_offset_sec <= body.offset_sec <= max_offset_sec:
         raise HTTPException(422, f"offset_sec must be {min_offset_sec:.2f} to {max_offset_sec:.2f}")
@@ -73,9 +74,3 @@ def _clip_or_404(catalog: Catalog, clip_id: str) -> Clip:
     if clip is None:
         raise HTTPException(404, f"no clip with id {clip_id}")
     return clip
-
-
-def _clip_duration_sec(storage: LocalStorage, clip: Clip) -> float:
-    """From the decoded audio, which is cached from alignment."""
-    clip_path = storage.path_for("clips", clip.id, Path(clip.filename).suffix.lower())
-    return audio.duration_sec(audio.decode(clip_path))

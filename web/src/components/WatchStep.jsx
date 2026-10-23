@@ -4,10 +4,13 @@ import {
   clipMediaUrl,
   referenceMediaUrl,
   renderSynced,
+  setClipEdits,
   setManualAlignment,
+  setReferenceFraming,
   syncedVideoUrl,
 } from "../api.js";
-import { effectiveAlignment, layoutFor, renderParams, takeRateFor } from "../flow.js";
+import { UNEDITED } from "../editing.js";
+import { effectiveAlignment, layoutFor, renderParams, takeRateFor, trimmedOffset } from "../flow.js";
 import { alignmentSummary } from "../tuning.js";
 import ComparePlayer from "./ComparePlayer.jsx";
 import DownloadButton from "./DownloadButton.jsx";
@@ -17,10 +20,12 @@ import Working from "./Working.jsx";
 
 // `layoutPick` lives in App, so a picked layout carries over to the next take.
 // `startTuning` opens the fine-tune panel straight away, after placing a take
-// by hand.
+// by hand. A song's framing is saved on the song (`onSongChange`), so it
+// carries over to every take of it.
 export default function WatchStep({
   song,
   clip,
+  onSongChange,
   onClipChange,
   onChangeMatch,
   onNewTake,
@@ -35,19 +40,28 @@ export default function WatchStep({
   // played at the alignment's rate, so Watch is ready the moment alignment
   // is. A browser that can't decode it (HEVC outside Safari, .mkv, .avi)
   // gets a render instead: the same take under its room sound, already at
-  // full tempo. Either way the song plays live from the song file, and a
-  // tuned alignment re-times the take live (takeRate). Only Download, and
-  // that fallback, render anything.
+  // full tempo, framed and trimmed. Either way the song plays live from the
+  // song file, and a tuned alignment re-times the take live (takeRate). Only
+  // Download, and that fallback, render anything.
   const [takeMedia, setTakeMedia] = useState({ url: clipMediaUrl(clip.id), renderedRate: 1, isRender: false });
   // The alignment being tuned in the fine-tune panel, or null when it's shut.
   const [draft, setDraft] = useState(startTuning ? effectiveAlignment(clip) : null);
+  // The video being adjusted and its edits so far, { target, edit: { framing,
+  // trim } }, or null when Adjust is shut.
+  const [adjust, setAdjust] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const wideViewport = useWideViewport();
   const layout = layoutFor({ picked: layoutPick, wideViewport, hasReferenceVideo });
   const alignment = draft ?? effectiveAlignment(clip);
   const takeRate = takeRateFor(alignment.rate, takeMedia.renderedRate);
-  const downloadUrl = syncedVideoUrl(clip.id, renderParams(clip, sound, layout));
+  const downloadUrl = syncedVideoUrl(clip.id, renderParams(song, clip, sound, layout));
+  // While the take is adjusted, the whole of it plays, to find where to trim.
+  const editing = adjust?.target;
+  const trim = editing === "take" ? null : clip.trim;
+  const trimStartSec = trim?.start_sec ?? 0;
+  const referenceFraming = editing === "reference" ? adjust.edit.framing : song.framing;
+  const takeFraming = editing === "take" ? adjust.edit.framing : clip.framing;
 
   // The raw take didn't play here, so play a render of it instead.
   function playRenderInstead() {
@@ -56,7 +70,7 @@ export default function WatchStep({
       setStatus("failed");
       return;
     }
-    const params = renderParams(clip, "room", "take");
+    const params = renderParams(song, clip, "room", "take");
     const url = syncedVideoUrl(clip.id, params);
     setStatus("rendering");
     renderSynced(url)
@@ -76,18 +90,42 @@ export default function WatchStep({
     if (sound === "both") setSound("song");
   }
 
-  async function saveTuning(save) {
+  function startAdjusting(target) {
+    const edit = target === "reference" ? { framing: song.framing, trim: null } : { framing: clip.framing, trim: clip.trim };
+    setAdjust({ target, edit });
+  }
+
+  // `save` resolves to the updated record; `onSaved` takes it, and the panel shuts.
+  async function save(request, onSaved, close) {
     setSaving(true);
     setError(null);
     try {
-      onClipChange(await save());
-      stopTuning();
+      onSaved(await request());
+      close();
     } catch (err) {
       setError(err.message);
     }
     setSaving(false);
   }
 
+  function saveAdjust() {
+    const close = () => setAdjust(null);
+    if (adjust.target === "reference") {
+      save(() => setReferenceFraming(song.id, adjust.edit.framing), onSongChange, close);
+    } else {
+      save(() => setClipEdits(clip.id, adjust.edit), onClipChange, close);
+    }
+  }
+
+  const adjusting = adjust && {
+    target: adjust.target,
+    edit: adjust.edit,
+    saving,
+    onChange: (edit) => setAdjust({ ...adjust, edit }),
+    onCancel: () => setAdjust(null),
+    onDone: saveAdjust,
+  };
+  const busy = draft !== null || adjust !== null;
   return (
     <section className="step">
       <button className="back" onClick={onNewTake}>← New take</button>
@@ -103,8 +141,13 @@ export default function WatchStep({
         <ComparePlayer
           referenceUrl={referenceMediaUrl(song.id)}
           takeUrl={takeMedia.url}
-          offsetSec={alignment.offset_sec}
+          offsetSec={trimmedOffset(alignment.offset_sec, alignment.rate, trimStartSec)}
           takeRate={takeRate}
+          // A render already has the take's trim and framing in it.
+          takeStartSec={takeMedia.isRender ? 0 : trimStartSec}
+          takeEndSec={takeMedia.isRender ? null : trim?.end_sec ?? null}
+          referenceFraming={referenceFraming}
+          takeFraming={takeMedia.isRender ? UNEDITED : takeFraming}
           sound={sound}
           tuning={draft !== null}
           onSoundChange={setSound}
@@ -112,6 +155,9 @@ export default function WatchStep({
           onTakeUnplayable={playRenderInstead}
           layout={layout}
           onLayoutChange={onLayoutPick}
+          onAdjust={draft === null ? startAdjusting : null}
+          takeAdjustable={!takeMedia.isRender}
+          adjusting={adjusting}
         />
       )}
       {error && <p className="error">{error}</p>}
@@ -120,18 +166,18 @@ export default function WatchStep({
           alignment={draft}
           saving={saving}
           onChange={setDraft}
-          onReset={() => saveTuning(() => clearManualAlignment(clip.id))}
+          onReset={() => save(() => clearManualAlignment(clip.id), onClipChange, stopTuning)}
           onCancel={stopTuning}
-          onDone={() => saveTuning(() => setManualAlignment(clip.id, draft))}
+          onDone={() => save(() => setManualAlignment(clip.id, draft), onClipChange, stopTuning)}
         />
       )}
-      {draft === null && (
+      {!busy && (
         <p className="caption">
           {alignmentSummary(clip)} · <button className="link" onClick={onChangeMatch}>Change match</button> ·{" "}
           <button className="link" onClick={() => setDraft(effectiveAlignment(clip))}>Fine-tune</button>
         </p>
       )}
-      {status === "ready" && draft === null && (
+      {status === "ready" && !busy && (
         <div className="actions">
           <DownloadButton primary url={downloadUrl} label="Download" onError={setError} />
         </div>

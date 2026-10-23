@@ -84,7 +84,7 @@ def test_records_saved_before_manual_existed_still_load():
 def test_render_uses_the_manual_values_and_a_new_file(client, clip, monkeypatch):
     renders = []
 
-    def fake_sync_clip(clip_path, reference_path, params, out_path):
+    def fake_sync_clip(clip_path, reference_path, params, edits, out_path):
         if out_path.exists():
             return False
         renders.append((params.rate, params.offset_sec, out_path.name))

@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dancesync.ffmpeg import ffmpeg_version, require_ffmpeg
 from server.auth import require_sign_in
 from server.config import ALLOWED_ORIGINS, PASSPHRASE, STORAGE_ROOT, WEB_DIST
-from server.routes import align, clips, references, session, synced
+from server.routes import align, clips, edits, references, session, synced
 from server.web import mount_web_app
 
 
@@ -51,6 +51,7 @@ app.include_router(session.router)
 app.include_router(references.router)
 app.include_router(clips.router)
 app.include_router(align.router)
+app.include_router(edits.router)
 app.include_router(synced.router)
 
 # Last, so its catch-all route never shadows an API route.

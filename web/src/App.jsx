@@ -73,6 +73,7 @@ export default function App() {
         <WatchStep
           song={song}
           clip={clip}
+          onSongChange={setSong}
           onClipChange={setClip}
           onChangeMatch={() => setStep("match")}
           onNewTake={() => setStep("video")}

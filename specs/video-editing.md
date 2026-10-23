@@ -106,6 +106,17 @@ The server validates the crop (inside 0..1 and at least `MIN_CROP_FRAC`) and the
 - A trimmed take stays in sync with the song from its new first frame
 - No edit forces a re-align
 
+## As built
+
+- **The edit types are frozen dataclasses in `dancesync/types.py`** (`Crop`, `Framing`, `Trim`, plus `Edits`, which bundles all three for a render), not Pydantic models in `server/models.py`. The server's records use them as field types, so there's one definition and the renderer never imports from `server/`.
+- **`dancesync/framing.py` also builds the trim filters** (`trim_chain`), which kept `sync.py` under 200 lines.
+- **The browser's helpers are in `web/src/editing.js`**, not `flow.js`, for the same reason: `framingStyle`, `mirroredCrop`, crop dragging, the trim buttons and `editsKey`. `trimmedOffset` is in `flow.js`, next to the other timing helpers.
+- **The browser's `edits` value is its own hash** (FNV-1a over the JSON), not the server's SHA-256: SHA-256 in the browser is async and missing outside HTTPS. The two only need to change whenever an edit does.
+- **While the take is being adjusted, the whole of it plays,** so the trim buttons can reach past the current trim. Reset clears the draft; Done saves it.
+- **Rotate drops the crop,** since the crop was a part of the old picture.
+- **A take the browser can't play (the render fallback) can't be adjusted:** its render already has the saved edits in it. Its saved edits still apply, and the song's video can still be adjusted.
+- **A trim may end up to `TRIM_END_SLACK_SEC` (0.5 s) past the take's length:** the browser measures the take by its picture and the server by its sound.
+
 ## Out of scope
 
 Crops that move over time (that's [follow-dancer](follow-dancer.md)), color and filters, cutting out the middle of a take, and a different reference framing for each take.

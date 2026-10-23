@@ -33,6 +33,17 @@ RENDER_CACHE_MAX_BYTES = int(float(os.environ.get("DANCESYNC_RENDER_CACHE_GB", 5
 MIN_MANUAL_RATE = 0.25
 MAX_MANUAL_RATE = 1.0
 
+# The smallest crop allowed, as a fraction of the frame in each dimension. A
+# tighter crop of a 1080p frame is upscaled more than ~3x in the 720p compare
+# render and turns to mush. The crop box stops at the same size
+# (MIN_CROP_FRAC in web/src/editing.js).
+MIN_CROP_FRAC = 0.2
+
+# How far past the take's end a trim may end. The browser measures the take
+# by its picture and the server by its sound, and a phone's sound can stop a
+# frame or two before its picture does.
+TRIM_END_SLACK_SEC = 0.5
+
 # The output of `npm --prefix web run build`. Served at / when it exists.
 WEB_DIST = Path(os.environ.get("DANCESYNC_WEB_DIST", ROOT / "web" / "dist"))
 

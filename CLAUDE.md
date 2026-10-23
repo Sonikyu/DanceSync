@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 DanceSync is a dance practice tool. Dancers record themselves practicing to slowed-down music, typically at 0.75x on a laptop speaker, filmed on a phone. The app syncs the video to the original-speed reference track, so dancers can review their practice at full tempo, in time with the music and next to the original choreography.
 
-**Status:** The MVP is built. That covers the production matcher (`dancesync/`), the FastAPI backend (`server/`), the ffmpeg sync engine, and the React web UI (`web/`). Phase 5's MVP items (CI, error cases, Docker, access control) and post-MVP features 1–5 (instant preview, review speed, manual alignment, layouts, YouTube import) are done too. What remains is tracked in `next-steps.md`; each feature has its own spec in `specs/`, broken into tickets in `tickets/`. The spike in `spike/` validated the alignment premise on both synthetic (Tier A) and real-world (Tier B) recordings.
+**Status:** The MVP is built. That covers the production matcher (`dancesync/`), the FastAPI backend (`server/`), the ffmpeg sync engine, and the React web UI (`web/`). Phase 5's MVP items (CI, error cases, Docker, access control) and post-MVP features 1–6 (instant preview, review speed, manual alignment, layouts, YouTube import, video editing) are done too. What remains is tracked in `next-steps.md`; each feature has its own spec in `specs/`, broken into tickets in `tickets/`. The spike in `spike/` validated the alignment premise on both synthetic (Tier A) and real-world (Tier B) recordings.
 
 **Audience:** The owner and friends. It runs locally or self-hosted; it is not a public site.
 
@@ -19,12 +19,13 @@ DanceSync/
 │   ├── audio.py              # decode any container → mono float32 @ SR (the only module that knows formats)
 │   ├── features.py           # chroma_cqt + z-score, frames_to_sec
 │   ├── matcher.py            # sliding correlation, peaks, rate search, match()
-│   ├── types.py              # Candidate, MatchResult
+│   ├── types.py              # Candidate, MatchResult; Crop, Framing, Trim, Edits (the edits a render applies)
 │   ├── sync.py               # what to render: ffmpeg filtergraphs for the synced take / compare (side-by-side, stacked) video
+│   ├── framing.py            # ffmpeg filter strings for the edits: rotate, crop, mirror, trim
 │   └── ffmpeg.py             # how to run ffmpeg: presence check, probe, encoder args, atomic writes
 ├── server/                   # FastAPI app
 │   ├── main.py               # app, CORS, routers
-│   ├── routes/               # session (sign-in), references (upload, YouTube import), clips, align (candidate select, manual alignment), synced
+│   ├── routes/               # session (sign-in), references (upload, YouTube import), clips, align (candidate select, manual alignment), edits (framing, trim), synced
 │   ├── models.py             # Pydantic request/response bodies + persisted records
 │   ├── storage.py            # raw bytes on disk, keyed by content hash
 │   ├── catalog.py            # JSON metadata records (kept separate from storage)
@@ -39,6 +40,7 @@ DanceSync/
 │       ├── App.jsx           # step machine: song → video → match (only if ambiguous) → watch; no match → place by hand → watch
 │       ├── flow.js           # pure helpers (timing, formatting), unit-tested with Vitest
 │       ├── tuning.js         # pure helpers for fine-tuning and placing a take by hand, unit-tested with Vitest
+│       ├── editing.js        # pure helpers for Adjust: framingStyle (CSS crop/mirror/rotate), crop dragging, trim, editsKey
 │       ├── api.js            # fetch/XHR wrappers + dancer-facing error messages
 │       └── components/       # one component per step, plus the player pieces
 ├── tests/                    # pytest: Tier A matcher regression, ambiguity, API, real renders
@@ -80,10 +82,10 @@ docker compose up -d --build                          # production-style: one co
   4. `matcher.match` produces the `AlignmentResult`: the top 3 candidates plus the `ambiguous` flag (`peak_ratio` < `AMBIGUOUS_PEAK_RATIO`) and the `failed` flag (winning score < `MIN_MATCH_SCORE`). It's saved in the catalog. Clips under `MIN_CLIP_SEC` are rejected with 422 before matching.
 - **Render** (runs on `HEAD`/`GET /api/clips/{id}/synced`: a Download, or the fallback when the browser can't play the raw clip):
   1. `routes/synced.py` takes the clip's effective alignment (`models.effective_alignment`): the manual alignment if the dancer set one on Watch, else the chosen candidate, else the best one. `flow.effectiveAlignment` is the browser's copy of that rule.
-  2. The route builds a `RenderParams` from that alignment plus `sound`/`layout`, and `worker.sync_clip` calls `sync.render_synced` (layout `take`) or `sync.render_compare` (`side-by-side`, `stacked`) with it.
+  2. The route builds a `RenderParams` from that alignment plus `sound`/`layout` and a hash of the edits (`models.edits_key`), and `worker.sync_clip` calls `sync.render_synced` (layout `take`) or `sync.render_compare` (`side-by-side`, `stacked`) with it and the `Edits`: the song's framing (`Reference.framing`), the take's (`Clip.framing`), and its trim (`Clip.trim`). `framing.py` builds their filters.
   3. `ffmpeg.run_to_file` writes the output. Its filename encodes every input, so an existing file is served as-is.
   4. `render_cache.touch` marks it used; after a new render, `render_cache.sweep` deletes the least recently used renders past `RENDER_CACHE_MAX_BYTES`.
-- **Watch** (in the browser): `ComparePlayer` plays the uploaded take itself (`GET /api/clips/{id}/media`) and the song media on one play bar, so Watch is ready the moment alignment is. If the browser can't decode the take (an `error`, or metadata with no picture), `WatchStep` falls back to a render of it under its room sound. The song plays from the song media, the room from the take, so the Sound control only flips which one is muted. `useLinkedPlayback` makes the element making the sound the clock (`flow.leaderAt`: the song while it's playing, else the take) and nudges the muted one's `playbackRate` to follow. The take plays at `flow.takeRateFor(rate, renderedRate)` relative to the song: the alignment's rate for the raw clip, the ratio of the two for a render. A tuned offset or rate applies live, and the song jumps to the new offset. Only Download, and that fallback, render anything. The fine-tune panel (`FineTune`) edits a draft alignment that plays at once, offers a "Both" sound while open, and saves it with `PUT /manual` on Done; Download is hidden until then, so it always renders saved values. A failed match leads to `PlaceStep`, which writes a rough manual alignment and opens Watch with the panel open. Review speed (0.5×/0.75×/1×) sets both base rates through `flow.playbackRates`, and the nudge is around that base; downloads are unaffected. The layout (side by side, stacked, take only; `flow.layoutFor`) is a class on `.compare`, and the one Download button renders that layout and sound.
+- **Watch** (in the browser): `ComparePlayer` plays the uploaded take itself (`GET /api/clips/{id}/media`) and the song media on one play bar, so Watch is ready the moment alignment is. If the browser can't decode the take (an `error`, or metadata with no picture), `WatchStep` falls back to a render of it under its room sound. The song plays from the song media, the room from the take, so the Sound control only flips which one is muted. `useLinkedPlayback` makes the element making the sound the clock (`flow.leaderAt`: the song while it's playing, else the take) and nudges the muted one's `playbackRate` to follow. The take plays at `flow.takeRateFor(rate, renderedRate)` relative to the song: the alignment's rate for the raw clip, the ratio of the two for a render. A tuned offset or rate applies live, and the song jumps to the new offset. Only Download, and that fallback, render anything. The fine-tune panel (`FineTune`) edits a draft alignment that plays at once, offers a "Both" sound while open, and saves it with `PUT /manual` on Done; Download is hidden until then, so it always renders saved values. A failed match leads to `PlaceStep`, which writes a rough manual alignment and opens Watch with the panel open. Review speed (0.5×/0.75×/1×) sets both base rates through `flow.playbackRates`, and the nudge is around that base; downloads are unaffected. The layout (side by side, stacked, take only; `flow.layoutFor`) is a class on `.compare`, and the one Download button renders that layout and sound. Adjust under each video (`AdjustPanel`, `CropBox`) edits its framing live and saves it with `PUT /api/references/{id}/framing` or `PUT /api/clips/{id}/edits` on Done; each video sits in a `.frame` the crop's shape, placed inside it by `editing.framingStyle`. A trim plays only that stretch of the take (`takeStartSec`/`takeEndSec`), with the song moved by `flow.trimmedOffset`. The render fallback has the take's edits baked in, so it isn't adjustable.
 
 `dancesync/` never imports from `server/`, and `server/` reaches the matcher and renderer only through `worker.py`.
 
@@ -94,8 +96,9 @@ docker compose up -d --build                          # production-style: one co
 3. **Overlap normalization with a floor.** Dividing correlation by overlap length prevents mid-reference bias, and `MIN_OVERLAP_FRAC` prevents edge-alignment artifacts.
 4. **`peak_ratio` detects ambiguity.** Self-similar music (repeated choruses) produces tied peaks. `peak_ratio` is the winner divided by the best peak outside an exclusion window. At upload, `AMBIGUOUS_PEAK_RATIO` (1.2, measured) decides whether the user has to pick from the top 3.
 5. **Parameters live in config, not inline.** Several must agree across modules.
-6. **Renders and playback share one timing model.** Clip time `t` heard reference time `offset_sec + t × rate`. Output time `T` shows clip time `T / rate` over reference time `offset_sec + T`. `sync.py`'s module docstring states this for ffmpeg, and `flow.referenceTimeFor` states it for the browser. If you change one, change the other.
-7. **Render cache names encode every input.** Everything a render depends on is a field of `RenderParams` in `server/models.py`: clip, reference, rate, offset, layout, and sound. `render_cache_id` names the file after every field, and the browser's `/synced` URL carries every field too (`RENDER_PARAM_FIELDS` in `api.js`, filled by `flow.renderParams`). Anything new that changes the picture or audio (edits, layouts, speeds) is a new field there, added to `RENDER_PARAM_FIELDS` as well; `tests/test_render_params.py` fails if the two lists drift. Otherwise the server or the browser serves a stale file.
+6. **Renders and playback share one timing model.** Clip time `t` heard reference time `offset_sec + t × rate`. Output time `T` shows clip time `T / rate` over reference time `offset_sec + T`. `sync.py`'s module docstring states this for ffmpeg, and `flow.referenceTimeFor` states it for the browser. If you change one, change the other. A trim starting at clip time `s` shifts the output's start to `trimmed_offset(offset_sec, rate, s)` = `offset_sec + s × rate` (`flow.trimmedOffset` in the browser); the stored offset never changes.
+7. **Render cache names encode every input.** Everything a render depends on is a field of `RenderParams` in `server/models.py`: clip, reference, rate, offset, layout, sound, and a hash of the edits (`edits`; the browser's `editing.editsKey` is its own hash, and the two needn't match). `render_cache_id` names the file after every field, and the browser's `/synced` URL carries every field too (`RENDER_PARAM_FIELDS` in `api.js`, filled by `flow.renderParams`). Anything new that changes the picture or audio (edits, layouts, speeds) is a new field there, added to `RENDER_PARAM_FIELDS` as well; `tests/test_render_params.py` fails if the two lists drift. Otherwise the server or the browser serves a stale file.
+8. **Framing is rotate, crop, mirror, in that order, on both sides.** The crop is stored in un-mirrored coordinates of the rotated frame. `framing.py` builds it for ffmpeg and `editing.framingStyle` for CSS; `editing.test.js` checks the CSS puts every pixel where the render does.
 
 ## Gotchas
 
@@ -127,14 +130,14 @@ The owner of this repo reviews and debugs every line. Write code they can read i
 - **Explicit over implicit.** No `**kwargs` passthrough unless you're wrapping an external API. No `setattr` magic. If a function takes 5 parameters, write out 5 parameters.
 - **Docstrings only where the signature isn't enough.** `decode_to_mono(path: Path, sr: int) -> np.ndarray` doesn't need one. A function whose units or coordinate system aren't obvious does.
 - **Type hints on public interfaces.** Module-level functions and dataclass fields get type hints. Local variables don't need them.
-- **Frontend:** function components and hooks, plain CSS in `styles.css`, no state library, no UI kit, and only `react`/`react-dom` at runtime. Put any logic that can be pure in `flow.js` (or `tuning.js`, for fine-tuning and placing a take) with a Vitest test, and keep components thin.
+- **Frontend:** function components and hooks, plain CSS in `styles.css`, no state library, no UI kit, and only `react`/`react-dom` at runtime. Put any logic that can be pure in `flow.js` (or `tuning.js`, for fine-tuning and placing a take, or `editing.js`, for Adjust) with a Vitest test, and keep components thin.
 
 ## Development conventions
 
 - **Python 3.11+**, with dependencies in `pyproject.toml` (the spike keeps its own `requirements.txt`). **Node 20.19+ or 22.12+** for Vite.
 - **ffmpeg** is a runtime dependency, required for all audio/video decoding and rendering.
 - **No code from `spike/` is imported into production.** Use the spike as a reference for behavior and edge cases.
-- **Tests are mandatory for production code.** Python code needs pytest, with the Tier A cases as the minimum regression suite. Frontend helpers in `flow.js` and `tuning.js` need Vitest tests.
+- **Tests are mandatory for production code.** Python code needs pytest, with the Tier A cases as the minimum regression suite. Frontend helpers in `flow.js`, `tuning.js` and `editing.js` need Vitest tests.
 - **All media files are gitignored:** `.data/server/` (uploads, catalog, renders), `.cache/dancesync/` (decoded audio, stretched features), and `spike/data/`.
 
 ## GitHub Actions
